@@ -1637,7 +1637,8 @@ export default function MobileApp() {
       )}
 
       {/* 用户端上报：指挥人员在这里一眼看到位置与内容，并可定位或直接拉响警报 */}
-      {peerReport && !alarm && (
+      {/* 报警进行中也要显示：这时候指挥人员最需要知道楼里有人报了什么 */}
+      {peerReport && (
         <div className={`peer-report tone-${peerReport.severity}`}>
           <div className="peer-report-head">
             <span className="peer-report-tag">{peerReport.label}</span>

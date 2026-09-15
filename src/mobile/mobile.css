@@ -1899,6 +1899,14 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .link-status.level-code { border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.1); }
 .link-status.level-code svg { color: #fbbf24; }
 .link-relay label { display: flex; flex-direction: column; gap: 5px; color: #8fa9c2; font-size: 9px; }
+.link-cloud { padding: 11px 12px; border: 1px solid rgba(56,189,248,.32); border-radius: 12px; background: rgba(14,165,233,.1); }
+.link-cloud label { display: flex; flex-direction: column; gap: 5px; color: #a9c6e6; font-size: 9px; }
+.link-cloud input { min-height: 40px; padding: 9px 11px; color: #eaf4ff; border: 1px solid rgba(56,189,248,.3); border-radius: 10px; background: rgba(2,10,22,.7); font-size: 10px; }
+.link-cloud-actions { display: flex; gap: 7px; margin-top: 8px; }
+.link-cloud-actions button { flex: 1; min-height: 36px; color: #dcecff; border: 1px solid rgba(56,189,248,.3); border-radius: 10px; background: rgba(14,165,233,.14); font-size: 9px; }
+.link-cloud-actions button.primary { color: #04212f; border-color: transparent; background: linear-gradient(110deg, #38bdf8, #7dd3fc); font-weight: 700; }
+.link-pair { width: 100%; margin-top: 8px; padding: 8px 10px; color: #9ad6ff; border: 1px solid rgba(56,189,248,.24); border-radius: 9px; background: rgba(2,10,22,.7); font-size: 8px; resize: none; }
+.link-status.level-cloud { border-color: rgba(56,189,248,.5); background: rgba(14,165,233,.14); }
 .link-relay input { min-height: 40px; padding: 9px 11px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.2); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 10px; }
 .link-relay button { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; min-height: 36px; padding: 0 12px; color: #dcecff; border: 1px solid rgba(96,165,250,.22); border-radius: 10px; background: rgba(59,130,246,.12); font-size: 9px; }
 .link-qr { padding: 11px 12px; border: 1px solid rgba(96,165,250,.18); border-radius: 12px; background: rgba(4,13,27,.55); }

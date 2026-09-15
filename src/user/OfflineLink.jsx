@@ -10,7 +10,11 @@ import {
   decodeEventCode,
   describeTransport,
   encodeEventCode,
+  makeCloudChannel,
+  parseCloudChannel,
+  readCloudChannel,
   readRelayBase,
+  saveCloudChannel,
   saveRelayBase,
   sharedEventBus,
 } from '../shared/eventBus.js'
@@ -19,6 +23,7 @@ export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, o
   const bus = useMemo(() => sharedEventBus(), [])
   const [status, setStatus] = useState(() => bus.status())
   const [relayBase, setRelayBase] = useState(() => readRelayBase())
+  const [cloudChannel, setCloudChannel] = useState(() => readCloudChannel())
   const [codeInput, setCodeInput] = useState('')
   const [message, setMessage] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -119,6 +124,12 @@ export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, o
     window.location.reload()
   }
 
+  const applyCloud = () => {
+    saveCloudChannel(cloudChannel)
+    bus.stop()
+    window.location.reload()
+  }
+
   return (
     <div className="more-body">
       <p className="more-hint">
@@ -130,13 +141,35 @@ export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, o
         <Link2 size={16} />
         <div>
           <strong>{describeTransport(status.level)}</strong>
-          <small>局域网中继：{status.relayOk ? `在线（${status.relayBase || '同源'}）` : '不可用'} · 已收发 {status.events} 条</small>
+          <small>
+            云端通道：{status.cloudOk ? '在线' : status.cloudChannel ? '配置了但连不上' : '未配置'} ·
+            局域网：{status.relayOk ? '在线' : '不可用'} · 已收发 {status.events} 条
+          </small>
         </div>
       </div>
 
+      <h4 className="link-title"><Server size={14} />云端通道（手机用移动网络时走这条）</h4>
+      <label className="ai-field">
+        通道暗号（两端填同一个值）
+        <input
+          type="text"
+          value={cloudChannel}
+          placeholder="ntfy:热感哨兵-xxxxx 或 https://你的中继域名"
+          onChange={(event) => setCloudChannel(event.target.value)}
+        />
+      </label>
+      <div className="more-actions">
+        <button type="button" onClick={() => setCloudChannel(makeCloudChannel())}>生成一个</button>
+        <button type="button" className="more-primary" onClick={applyCloud}>保存云端通道</button>
+      </div>
+      <p className="more-hint">
+        系统端「链路」面板里点“生成一个新通道”，把那个值填到这里（或扫它的二维码）即可配对；
+        留空表示不用云端，退回局域网/离线码。
+      </p>
+
       <div className="link-relay">
         <label className="ai-field">
-          中继地址（留空 = 当前站点同源）
+          局域网中继地址（可选，留空 = 当前站点同源）
           <input type="text" value={relayBase} placeholder="http://192.168.1.20:4173" onChange={(event) => setRelayBase(event.target.value)} />
         </label>
         <div className="more-actions">

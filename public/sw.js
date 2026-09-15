@@ -1,6 +1,6 @@
-const CACHE = 'thermal-guard-v6'
+const CACHE = 'thermal-guard-v7'
 // 逃生指引页与它的 manifest 必须预缓存：断网时用户最需要这个页面
-const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './thermal-guard.mobileconfig', './demo-live.gif', './manifest.webmanifest', './manifest-user.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png']
+const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './thermal-guard.mobileconfig', './ai-config.json', './demo-live.gif', './manifest.webmanifest', './manifest-user.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './download/qr-user.svg', './download/qr-system.svg', './download/热感哨兵-用户端-安装.mobileconfig', './download/热感哨兵-系统端-安装.mobileconfig']
 const SHELLS = ['./index.html', './mobile-app.html', './user-app.html']
 
 // Vite 产物文件名带 hash，没法写死在清单里。首次加载时 Service Worker 还没接管页面，

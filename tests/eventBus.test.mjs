@@ -10,6 +10,8 @@ import {
   fireFromEvent,
   isExpired,
   mergeEvents,
+  makeCloudChannel,
+  parseCloudChannel,
   peerReportSummary,
 } from '../src/shared/eventBus.js'
 
@@ -68,11 +70,35 @@ console.log('[3] 去重 / 过期 / 容量')
 
 console.log('[4] 链路选择')
 {
+  check('配了云端通道就优先走云端（住户手机蜂窝网络）', chooseTransport({ cloudOk: true, relayOk: true }) === 'cloud')
   check('中继可用时走局域网', chooseTransport({ relayOk: true }) === 'lan')
   check('中继不可用但有同机通道时走本地', chooseTransport({ relayOk: false, hasLocal: true }) === 'local')
   check('什么都没有时只能用离线码', chooseTransport({ relayOk: false, hasLocal: false }) === 'code')
   check('强制人工时用离线码', chooseTransport({ relayOk: true, manualOnly: true }) === 'code')
   check('文案能说清是否需要互联网', describeTransport('lan').includes('不需要互联网') && describeTransport('code').includes('不需要网络'))
+  check('云端文案说明蜂窝网络可用', describeTransport('cloud').includes('蜂窝'))
+}
+
+console.log('[4b] 云端通道解析')
+{
+  const ntfy = parseCloudChannel('ntfy:tg-abc123')
+  check('ntfy 模式识别主题', ntfy.mode === 'ntfy' && ntfy.topic === 'tg-abc123')
+  check('ntfy 发布地址正确', ntfy.publishUrl === 'https://ntfy.sh/tg-abc123')
+  check('ntfy 轮询地址正确', ntfy.pollUrl === 'https://ntfy.sh/tg-abc123/json')
+
+  const bare = parseCloudChannel('tg-abc123')
+  check('不带前缀也按 ntfy 处理', bare.mode === 'ntfy' && bare.topic === 'tg-abc123')
+
+  const rest = parseCloudChannel('https://relay.example.com/')
+  check('自定义中继走 rest 模式', rest.mode === 'rest' && rest.publishUrl === 'https://relay.example.com/events')
+  check('自定义中继健康检查地址', rest.healthUrl === 'https://relay.example.com/health')
+
+  check('空值视为关闭', parseCloudChannel('').mode === 'off')
+  check('非法主题被拒绝', parseCloudChannel('ntfy:带空格 的 主题').mode === 'off')
+
+  const generated = makeCloudChannel()
+  check('生成的通道以 ntfy: 开头且可解析', generated.startsWith('ntfy:') && parseCloudChannel(generated).mode === 'ntfy')
+  check('生成的通道足够随机（两次不同）', makeCloudChannel() !== makeCloudChannel())
 }
 
 console.log('[5] 火情事件 → 传感器结构')

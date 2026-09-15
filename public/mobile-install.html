@@ -5,30 +5,37 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index,follow" />
-  <title>手机安装｜AI热感火警风险检测系统</title>
+  <meta name="description" content="热感哨兵手机安装中心：iPhone 描述文件、Android PWA、云端通道配对" />
+  <title>手机安装｜热感哨兵</title>
   <style>
-    :root { color-scheme: dark; --bg:#06101f; --panel:#101d31; --line:rgba(96,165,250,.2); --text:#f3f8ff; --muted:#8ea5c2; --blue:#3b82f6; --cyan:#38bdf8; --orange:#f97316; --green:#22c55e; }
+    :root { color-scheme: dark; --bg:#06101f; --line:rgba(96,165,250,.2); --text:#f3f8ff; --muted:#8ea5c2; --blue:#3b82f6; --cyan:#38bdf8; --orange:#f97316; --green:#22c55e; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(circle at 80% 0,rgba(37,99,235,.23),transparent 32%),radial-gradient(circle at 20% 80%,rgba(239,68,68,.12),transparent 30%),var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
-    main { width:min(720px,calc(100% - 32px)); margin:0 auto; padding:44px 0 64px; }
-    .brand { display:flex; align-items:center; gap:13px; margin-bottom:30px; }
+    main { width:min(760px,calc(100% - 32px)); margin:0 auto; padding:44px 0 64px; }
+    .brand { display:flex; align-items:center; gap:13px; margin-bottom:26px; }
     .logo { width:52px; height:52px; border-radius:14px; box-shadow:0 10px 30px rgba(59,130,246,.25); }
     .brand strong { display:block; font-size:18px; }
     .brand small { color:var(--muted); letter-spacing:.14em; font-size:10px; }
-    h1 { font-size:34px; line-height:1.2; letter-spacing:-.03em; margin:0 0 14px; }
-    .lead { color:var(--muted); line-height:1.8; margin:0 0 28px; }
-    .card { padding:20px; margin-top:14px; border:1px solid var(--line); border-radius:20px; background:linear-gradient(145deg,rgba(21,38,64,.88),rgba(7,16,31,.9)); box-shadow:0 24px 60px rgba(0,0,0,.25); }
+    h1 { font-size:32px; line-height:1.22; letter-spacing:-.03em; margin:0 0 12px; }
+    .lead { color:var(--muted); line-height:1.8; margin:0 0 22px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media (max-width:640px) { .grid { grid-template-columns:1fr; } h1 { font-size:27px; } }
+    .card { padding:20px; border:1px solid var(--line); border-radius:20px; background:linear-gradient(145deg,rgba(21,38,64,.88),rgba(7,16,31,.9)); box-shadow:0 24px 60px rgba(0,0,0,.25); }
     .card.featured { border-color:rgba(56,189,248,.38); }
+    .card.wide { grid-column:1 / -1; }
     .card-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:10px; }
-    .card h2 { font-size:20px; margin:0; }
+    .card h2 { font-size:18px; margin:0; }
     .tag { padding:5px 8px; border-radius:999px; font-size:10px; color:#8ce0b0; background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.2); }
-    .card p, .card li { color:var(--muted); font-size:14px; line-height:1.75; }
-    .button { display:flex; align-items:center; justify-content:center; min-height:52px; margin-top:17px; padding:0 18px; border-radius:12px; color:#fff; text-decoration:none; font-weight:700; background:linear-gradient(110deg,var(--blue),var(--cyan)); box-shadow:0 12px 28px rgba(37,99,235,.28); }
+    .tag.blue { color:#9ad6ff; background:rgba(56,189,248,.1); border-color:rgba(56,189,248,.22); }
+    .card p, .card li { color:var(--muted); font-size:13px; line-height:1.75; }
+    .qr { display:block; width:150px; height:150px; margin:12px auto 4px; background:#fff; border-radius:12px; padding:6px; }
+    .button { display:flex; align-items:center; justify-content:center; min-height:50px; margin-top:12px; padding:0 16px; border-radius:12px; color:#fff; text-decoration:none; font-weight:700; background:linear-gradient(110deg,var(--blue),var(--cyan)); box-shadow:0 12px 28px rgba(37,99,235,.28); text-align:center; }
     .button.secondary { color:#d7e7fb; background:rgba(59,130,246,.12); border:1px solid rgba(96,165,250,.25); box-shadow:none; }
-    .notice { margin-top:24px; padding:16px; border:1px solid rgba(249,115,22,.2); border-radius:14px; background:rgba(249,115,22,.07); color:#d9b08e; font-size:12px; line-height:1.7; }
+    .button.ghost { color:#9fc0dd; background:transparent; border:1px dashed rgba(148,163,184,.35); box-shadow:none; font-weight:600; }
+    .steps { margin:14px 0 0; padding-left:20px; }
+    .notice { margin-top:18px; padding:15px; border:1px solid rgba(249,115,22,.2); border-radius:14px; background:rgba(249,115,22,.07); color:#d9b08e; font-size:12px; line-height:1.7; }
     code { color:#93c5fd; word-break:break-all; }
-    .steps { margin:16px 0 0; padding-left:20px; }
-    @media (max-width:520px) { main { padding-top:28px; } h1 { font-size:29px; } .card { padding:17px; } }
+    .meta { color:#6f89a4; font-size:11px; }
   </style>
 </head>
 <body>
@@ -38,84 +45,71 @@
     <div><strong>热感哨兵</strong><small>手机安装中心</small></div>
   </div>
 
-  <h1>把热感火警检测装到手机主屏幕</h1>
-  <p class="lead">选择你的手机系统。无需 App Store 或 Apple 开发者账号，安装后会生成独立图标，并像普通 App 一样全屏打开，支持3D热感监控与疏散导航。</p>
+  <h1>装到手机主屏幕，两种系统都行</h1>
+  <p class="lead">
+    不需要 App Store、不需要 Apple 开发者账号，也不需要连校园网：装好后就是一个独立图标，点开即用。
+    两端通过<strong>云端通道</strong>互通——住户手机用 4G/5G 就能收到火警与位置。
+  </p>
 
-  <section class="card featured" id="ios-card">
-    <div class="card-head"><h2>iPhone / iPad 描述文件版</h2><span class="tag">设置安装</span></div>
-    <p>此版本通过苹果“描述文件”安装，适合希望在系统设置中确认安装的用户。必须使用 Safari 打开，并确保网页以 HTTPS 访问。</p>
-    <a class="button" id="profile-install-link" href="./thermal-guard.mobileconfig">打开手机描述文件</a>
-    <ol class="steps">
-      <li>点击上方按钮，选择“允许”。</li>
-      <li>打开“设置 → 通用 → VPN与设备管理”。</li>
-      <li>点击“已下载的描述文件”，选择“安装”。</li>
-      <li>返回主屏幕，点击“热感哨兵”图标。</li>
-    </ol>
-    <a class="button secondary" href="./mobile-app.html">改用免描述文件安装版</a>
-  </section>
+  <div class="grid">
+    <section class="card featured">
+      <div class="card-head"><h2>用户端 · 逃生指引</h2><span class="tag blue">给居民/师生</span></div>
+      <p>一个表盘告诉你往哪走、多远，火警时按路线指引撤离，可上传本层疏散图。</p>
+      <img class="qr" src="./download/qr-user.svg" alt="用户端二维码" />
+      <p class="meta" style="text-align:center">扫一扫用手机打开</p>
+      <a class="button" href="./user-app.html">打开用户端</a>
+      <a class="button secondary" href="./download/热感哨兵-用户端-安装.mobileconfig">iPhone 安装配置文件（.mobileconfig）</a>
+    </section>
 
-  <section class="card" id="android-card">
-    <div class="card-head"><h2>Android 安装</h2><span class="tag">PWA</span></div>
-    <p>Android 无法安装 Mac 的 DMG 文件。请使用 Chrome 打开网页版并安装为 Web App。</p>
-    <a class="button secondary" href="./mobile-app.html">打开网页并安装</a>
-    <ol class="steps">
-      <li>使用 Chrome 打开网页。</li>
-      <li>点击右上角“⋮”菜单。</li>
-      <li>选择“安装应用”或“添加到主屏幕”。</li>
-      <li>确认后即可从主屏幕运行。</li>
-    </ol>
-  </section>
+    <section class="card">
+      <div class="card-head"><h2>系统端 · 指挥/物业</h2><span class="tag">给消防/物业</span></div>
+      <p>检测、三维校园、人流、链路与 AI 三阶段面板，用于值守和指挥。</p>
+      <img class="qr" src="./download/qr-system.svg" alt="系统端二维码" />
+      <p class="meta" style="text-align:center">扫一扫用手机打开</p>
+      <a class="button" href="./mobile-app.html">打开系统端</a>
+      <a class="button secondary" href="./download/热感哨兵-系统端-安装.mobileconfig">iPhone 安装配置文件（.mobileconfig）</a>
+    </section>
 
-  <section class="card">
-    <div class="card-head"><h2>Mac 电脑安装</h2><span class="tag">DMG</span></div>
-    <p>Mac 用户请下载完整原生 App，支持模拟热像仪、ESP32 串口和 Wi-Fi WebSocket。</p>
-    <a class="button secondary" href="https://github.com/roubizhao6-sys/ai-thermal-fire-risk-system/releases/latest/download/AIThermalFireGuard-macOS-1.0.3.dmg">下载 Mac 安装包</a>
-  </section>
+    <section class="card wide">
+      <div class="card-head"><h2>iPhone / iPad 安装步骤</h2><span class="tag">描述文件 + 主屏图标</span></div>
+      <ol class="steps">
+        <li>用 <strong>Safari</strong> 打开本页（微信内打开请点右上角“在浏览器中打开”）。</li>
+        <li>点上面的“iPhone 安装配置文件”，系统提示“此网站正尝试下载一个配置描述文件”，选<strong>允许</strong>。</li>
+        <li>打开 <strong>设置 → 通用 → VPN 与设备管理</strong>，点“已下载的描述文件 → 安装”（未签名属正常，我们只写入一个主屏快捷方式，不改任何系统设置）。</li>
+        <li>回到主屏幕，点新出现的图标即可全屏使用。</li>
+      </ol>
+      <p class="meta">不想装描述文件？也可以：Safari 打开页面 → 分享 → “添加到主屏幕”。效果一样。</p>
+    </section>
 
-  <div class="notice">
-    <strong>说明：</strong>手机安装版是无需开发者签名的 Web App 安装方式，不是原生 `.ipa` 或 `.apk` 文件。若需要原生手机 App，需要单独开发 iOS/Android 工程并完成对应平台签名。
+    <section class="card wide">
+      <div class="card-head"><h2>Android 安装步骤</h2><span class="tag">PWA 网页应用</span></div>
+      <ol class="steps">
+        <li>用 <strong>Chrome</strong> 打开上面的页面（扫二维码最快）。</li>
+        <li>右上角菜单里选 <strong>“安装应用 / 添加到主屏幕”</strong>；有的机型会直接弹出安装提示。</li>
+        <li>安装后从桌面图标打开，全屏运行、支持离线打开逃生页。</li>
+      </ol>
+      <p class="meta">Android 不需要配置文件；如果你们要正式商店版本，可后续用 Android Studio 把同一个网址打成 TWA/APK。</p>
+    </section>
+
+    <section class="card wide">
+      <div class="card-head"><h2>两端怎么互通（云端通道）</h2><span class="tag blue">不依赖局域网</span></div>
+      <ol class="steps">
+        <li>系统端顶栏点「<strong>链路</strong>」→ 点“生成一个新通道”，会得到一串暗号（例如 <code>ntfy:tg-k3f9…</code>）。</li>
+        <li>把这个暗号填到用户端的「更多 → 离线联通 → 云端通道」，或让用户端扫这个二维码，两端就配好对了。</li>
+        <li>配好之后：系统端拉响警报 → 用户端立刻显示“哪里起火、往哪走”；用户端上报火源 → 系统端弹出横幅并可一键拉响警报。全部走公网，住户手机用移动网络即可。</li>
+      </ol>
+      <div class="notice">
+        原型阶段默认用公开的 <code>ntfy.sh</code> 转发（零部署，通道名即暗号，别用真实姓名做通道名）。
+        正式部署请换成你们自己的中继：仓库里给了两个可直接上线的实现——
+        <code>tools/relay-server.mjs</code>（Node，可跑在任意云主机/Vercel/Render）与
+        <code>tools/relay-worker.mjs</code>（Cloudflare Worker 免费额度即可）。
+        把「云端通道」填成你们的中继域名即可，两端协议完全一致。
+      </div>
+      <p class="meta">极端情况（网络设备损坏、信号被干扰）仍保留兜底：链路面板的“离线事件码”二维码，扫码即可传递火警位置，完全不需要网络。</p>
+    </section>
   </div>
+
+  <p class="meta" style="margin-top:22px">热感哨兵 · 澳门科技大学 · 本页仅用于科研演示原型安装。</p>
 </main>
-<script>
-  const profileLink = document.getElementById('profile-install-link');
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {});
-  }
-
-  async function ensureProfileMode() {
-    if (!('serviceWorker' in navigator)) return;
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      if (navigator.serviceWorker.controller) {
-        try {
-          const response = await fetch(profileLink.href, { cache: 'no-store' });
-          if ((response.headers.get('content-type') || '').includes('application/x-apple-aspen-config')) return;
-        } catch {}
-      }
-      try {
-        const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-        await registration.update();
-      } catch {}
-      await Promise.race([
-        new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true })),
-        wait(600)
-      ]);
-    }
-  }
-
-  profileLink.addEventListener('click', async (event) => {
-    if (!('serviceWorker' in navigator)) return;
-    event.preventDefault();
-    await ensureProfileMode();
-    window.location.href = profileLink.href;
-  });
-
-  const ua = navigator.userAgent || '';
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isAndroid = /Android/i.test(ua);
-  if (isIOS) document.getElementById('ios-card').scrollIntoView({block:'center'});
-  if (isAndroid) document.getElementById('android-card').scrollIntoView({block:'center'});
-</script>
 </body>
 </html>

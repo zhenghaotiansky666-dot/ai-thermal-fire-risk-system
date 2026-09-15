@@ -10,17 +10,17 @@
       <key>PayloadVersion</key>
       <integer>1</integer>
       <key>PayloadIdentifier</key>
-      <string>com.thermalguard.webclip.user</string>
+      <string>com.thermalguard.webclip.system</string>
       <key>PayloadUUID</key>
-      <string>41eb852f-b852-42fc-8963-0da741eb741e</string>
+      <string>b852fc96-2fc9-4963-80da-741eb852eb85</string>
       <key>PayloadDisplayName</key>
-      <string>热感哨兵 · 逃生指引</string>
+      <string>热感哨兵 · 系统端</string>
       <key>PayloadDescription</key>
-      <string>在 iPhone / iPad 主屏幕添加「逃生指引」图标，点开即用（可随时删除）。</string>
+      <string>在 iPhone / iPad 主屏幕添加「热感哨兵」图标，点开即用（可随时删除）。</string>
       <key>URL</key>
-      <string>https://zhenghaotiansky666-dot.github.io/ai-thermal-fire-risk-system/user-app.html</string>
+      <string>https://zhenghaotiansky666-dot.github.io/ai-thermal-fire-risk-system/mobile-app.html</string>
       <key>Label</key>
-      <string>逃生指引</string>
+      <string>热感哨兵</string>
       <key>Icon</key>
       <data>
       iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAABWI0lEQVR42u29d7QkWXEm
@@ -473,13 +473,13 @@
   <key>PayloadVersion</key>
   <integer>1</integer>
   <key>PayloadIdentifier</key>
-  <string>com.thermalguard.install.user</string>
+  <string>com.thermalguard.install.system</string>
   <key>PayloadUUID</key>
-  <string>1eb852fc-852f-4fc9-8630-da741eb841eb</string>
+  <string>52fc9630-c963-430d-8a74-1eb852fc852f</string>
   <key>PayloadDisplayName</key>
-  <string>热感哨兵 · 逃生指引 安装配置</string>
+  <string>热感哨兵 · 系统端 安装配置</string>
   <key>PayloadDescription</key>
-  <string>热感哨兵 逃生指引 的网页应用快捷方式（不修改系统设置、不采集任何信息）。</string>
+  <string>热感哨兵 热感哨兵 的网页应用快捷方式（不修改系统设置、不采集任何信息）。</string>
   <key>PayloadOrganization</key>
   <string>澳门科技大学 · 热感哨兵</string>
   <key>PayloadRemovalDisallowed</key>

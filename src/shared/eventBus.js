@@ -18,8 +18,10 @@ export const EVENT_VERSION = 1
 export const EVENT_LIMIT = 60
 export const DEFAULT_TTL_MS = 30 * 60 * 1000
 export const RELAY_BASE_KEY = 'thermalGuardRelayBase'
+export const CLOUD_CHANNEL_KEY = 'thermalGuardCloudChannel'
 export const STORAGE_KEY = 'thermalGuardFire' // 与旧版兼容：火情事件仍写入这个键
 export const BULK_STORAGE_KEY = 'thermalGuardEventLog'
+export const NTFY_BASE = 'https://ntfy.sh'
 
 const KINDS = new Set(['fire', 'clear', 'notice', 'status', 'report'])
 
@@ -149,18 +151,79 @@ export function decodeEventCode(code) {
 
 // ---------------------------------------------------------------- 链路选择（纯函数）
 // 输入运行时可用的能力，输出应该使用哪一级链路
-export function chooseTransport({ hasLocal = true, relayOk = false, manualOnly = false } = {}) {
+export function chooseTransport({ hasLocal = true, relayOk = false, cloudOk = false, manualOnly = false } = {}) {
   if (manualOnly) return 'code'
+  // 云端通道优先级最高：住户手机、蜂窝网络、跨校园都靠它（不依赖任何局域网）
+  if (cloudOk) return 'cloud'
   if (relayOk) return 'lan'
   if (hasLocal) return 'local'
   return 'code'
 }
 
 export function describeTransport(level) {
+  if (level === 'cloud') return '云端通道（手机蜂窝网络即可，跨楼跨小区）'
   if (level === 'lan') return '局域网中继（不需要互联网）'
   if (level === 'local') return '同机同浏览器（两个页面直接互通）'
   if (level === 'code') return '离线码（二维码/粘贴，完全不需要网络）'
   return '未联通'
+}
+
+// ---------------------------------------------------------------- 云端通道（纯函数）
+// 支持两种云端通道：
+//   · ntfy:<主题>  → 用公开的 ntfy.sh 转发（零部署，适合演示与原型，主题名即暗号）
+//   · https://…    → 你自己的 REST 中继（POST /events、GET /events?since=，见 tools/relay-server.mjs）
+export function parseCloudChannel(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return { mode: 'off', raw: '' }
+  if (text.startsWith('http://') || text.startsWith('https://')) {
+    return {
+      mode: 'rest',
+      raw: text,
+      base: text.replace(/\/$/, ''),
+      publishUrl: `${text.replace(/\/$/, '')}/events`,
+      pollUrl: `${text.replace(/\/$/, '')}/events`,
+      healthUrl: `${text.replace(/\/$/, '')}/health`,
+    }
+  }
+  const topic = text.startsWith('ntfy:') ? text.slice(5).trim() : text
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(topic)) return { mode: 'off', raw: text, reason: 'bad-topic' }
+  return {
+    mode: 'ntfy',
+    raw: text,
+    topic,
+    base: NTFY_BASE,
+    publishUrl: `${NTFY_BASE}/${topic}`,
+    pollUrl: `${NTFY_BASE}/${topic}/json`,
+    healthUrl: `${NTFY_BASE}/${topic}/json?poll=1&since=all`,
+  }
+}
+
+// 一键生成一个随机云端通道（主题名足够长，避免和别人的主题撞上）
+export function makeCloudChannel(prefix = 'tg') {
+  const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789'
+  let tail = ''
+  for (let index = 0; index < 14; index += 1) {
+    tail += alphabet[Math.floor(Math.random() * alphabet.length)]
+  }
+  return `ntfy:${prefix}-${tail}`
+}
+
+export function readCloudChannel() {
+  if (typeof localStorage === 'undefined') return ''
+  try {
+    return localStorage.getItem(CLOUD_CHANNEL_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function saveCloudChannel(value) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const text = String(value ?? '').trim()
+    if (text) localStorage.setItem(CLOUD_CHANNEL_KEY, text)
+    else localStorage.removeItem(CLOUD_CHANNEL_KEY)
+  } catch {}
 }
 
 // ---------------------------------------------------------------- 运行时：事件总线
@@ -168,10 +231,15 @@ export function createEventBus(options = {}) {
   const channelName = options.channelName ?? 'thermalGuard'
   const relayBase = (options.relayBase ?? readRelayBase()).replace(/\/$/, '')
   const pollMs = Number(options.pollMs) || 3000
+  const cloudChannel = parseCloudChannel(options.cloudChannel ?? readCloudChannel())
+  const cloudPollMs = Number(options.cloudPollMs) || 3500
   const listeners = new Set()
   const state = {
     level: 'local',
     relayOk: false,
+    cloudOk: false,
+    cloudChannel: cloudChannel.raw ?? '',
+    cloudCursor: '',
     lastSeq: 0,
     peers: 0,
     log: [],
@@ -181,6 +249,7 @@ export function createEventBus(options = {}) {
   let channel = null
   let timer = null
   let probeTimer = null
+  let cloudTimer = null
   let stopped = false
 
   function emit(event) {
@@ -227,7 +296,7 @@ export function createEventBus(options = {}) {
     } catch {
       state.relayOk = false
     }
-    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk })
+    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk, cloudOk: state.cloudOk })
     return state.relayOk
   }
 
@@ -254,10 +323,92 @@ export function createEventBus(options = {}) {
         await publishRelay(safe)
       } catch {
         state.relayOk = false
-        state.level = chooseTransport({ hasLocal: true, relayOk: false })
+        state.level = chooseTransport({ hasLocal: true, relayOk: false, cloudOk: state.cloudOk })
+      }
+    }
+    if (state.cloudOk) {
+      try {
+        await publishCloud(safe)
+      } catch {
+        state.cloudOk = false
+        state.level = chooseTransport({ hasLocal: true, relayOk: state.relayOk, cloudOk: false })
       }
     }
     return safe
+  }
+
+  // -------------------------------------------------------------- 云端通道
+  function cloudTarget() {
+    return parseCloudChannel(options.cloudChannel ?? readCloudChannel())
+  }
+
+  async function probeCloud() {
+    const target = cloudTarget()
+    state.cloudChannel = target.raw ?? ''
+    if (target.mode === 'off') {
+      state.cloudOk = false
+      state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk })
+      return false
+    }
+    try {
+      const response = await fetch(target.healthUrl, { cache: 'no-store' })
+      state.cloudOk = response.ok
+    } catch {
+      state.cloudOk = false
+    }
+    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk, cloudOk: state.cloudOk })
+    return state.cloudOk
+  }
+
+  async function publishCloud(event) {
+    const target = cloudTarget()
+    if (target.mode === 'off') return
+    const response = await fetch(target.publishUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    })
+    if (!response.ok) throw new Error(`cloud-${response.status}`)
+    if (target.mode === 'ntfy') {
+      const data = await response.json().catch(() => null)
+      if (data?.id) state.cloudCursor = String(data.id)
+    }
+  }
+
+  async function pollCloud() {
+    const target = cloudTarget()
+    if (target.mode === 'off' || !state.cloudOk) return
+    try {
+      if (target.mode === 'ntfy') {
+        const since = state.cloudCursor || 'all'
+        const response = await fetch(`${target.pollUrl}?poll=1&since=${encodeURIComponent(since)}`, { cache: 'no-store' })
+        if (!response.ok) return
+        const text = await response.text()
+        text.split('\n').filter(Boolean).forEach((line) => {
+          let record = null
+          try {
+            record = JSON.parse(line)
+          } catch {
+            return
+          }
+          if (record?.id) state.cloudCursor = String(record.id)
+          if (record?.event !== 'message' || typeof record.message !== 'string') return
+          let event = null
+          try {
+            event = JSON.parse(record.message)
+          } catch {
+            return
+          }
+          if (event?.id) emit(event)
+        })
+        return
+      }
+      const response = await fetch(`${target.pollUrl}?since=${encodeURIComponent(state.cloudCursor || '')}`, { cache: 'no-store' })
+      if (!response.ok) return
+      const data = await response.json().catch(() => null)
+      if (data?.cursor) state.cloudCursor = String(data.cursor)
+      ;(data?.events ?? []).forEach((event) => emit(event))
+    } catch {}
   }
 
   function start() {
@@ -298,7 +449,21 @@ export function createEventBus(options = {}) {
         probeTimer = window.setInterval(() => probeRelay(), 15000)
       }
     }
-    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk })
+    if (typeof fetch === 'function') {
+      probeCloud().then((ok) => {
+        if (!ok || stopped || typeof window === 'undefined') return
+        const loop = async () => {
+          if (stopped) return
+          await pollCloud()
+          if (!stopped) cloudTimer = window.setTimeout(loop, cloudPollMs)
+        }
+        loop()
+      })
+      if (typeof window !== 'undefined') {
+        window.setInterval(() => probeCloud(), 20000)
+      }
+    }
+    state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk, cloudOk: state.cloudOk })
     return state
   }
 
@@ -306,8 +471,10 @@ export function createEventBus(options = {}) {
     stopped = true
     if (timer && typeof window !== 'undefined') window.clearTimeout(timer)
     if (probeTimer && typeof window !== 'undefined') window.clearInterval(probeTimer)
+    if (cloudTimer && typeof window !== 'undefined') window.clearTimeout(cloudTimer)
     timer = null
     probeTimer = null
+    cloudTimer = null
     try {
       channel?.close()
     } catch {}
@@ -321,6 +488,8 @@ export function createEventBus(options = {}) {
       label: describeTransport(state.level),
       relayOk: state.relayOk,
       relayBase,
+      cloudOk: state.cloudOk,
+      cloudChannel: state.cloudChannel,
       peers: state.peers,
       events: state.log.length,
       lastAt: state.log.at(-1)?.at ?? null,
@@ -332,7 +501,7 @@ export function createEventBus(options = {}) {
     return [...state.log]
   }
 
-  return { start, stop, publish, onEvent, status, recent, probeRelay }
+  return { start, stop, publish, onEvent, status, recent, probeRelay, probeCloud }
 }
 
 // ---------------------------------------------------------------- 中继地址（同源优先）

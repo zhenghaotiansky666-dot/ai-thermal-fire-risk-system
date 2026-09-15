@@ -8,11 +8,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link2, QrCode, RefreshCw, Server, Smartphone, X } from 'lucide-react'
 import {
-  createEvent,
   describeTransport,
+  createEvent,
   encodeEventCode,
+  makeCloudChannel,
   mergeEvents,
+  parseCloudChannel,
+  readCloudChannel,
   readRelayBase,
+  saveCloudChannel,
   saveRelayBase,
   sharedEventBus,
 } from '../shared/eventBus.js'
@@ -21,6 +25,7 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
   const bus = useMemo(() => sharedEventBus(), [])
   const [status, setStatus] = useState(() => bus.status())
   const [relayBase, setRelayBase] = useState(() => readRelayBase())
+  const [cloudChannel, setCloudChannel] = useState(() => readCloudChannel())
   // 打开面板时先灌入总线里已有的事件，再接收后续新增
   const [events, setEvents] = useState(() => bus.recent())
   const [qr, setQr] = useState('')
@@ -81,6 +86,15 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
     window.location.reload()
   }
 
+  const applyCloud = () => {
+    saveCloudChannel(cloudChannel)
+    bus.stop()
+    window.location.reload()
+  }
+
+  const cloudInfo = parseCloudChannel(cloudChannel)
+  const pairCode = `TGS-PAIR:${cloudChannel}`.trim()
+
   const received = events.filter((event) => event.kind === 'report' || event.kind === 'status')
 
   return (
@@ -103,15 +117,41 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
           <div>
             <strong>{status.label}</strong>
             <small>
-              局域网中继：{status.relayOk ? `在线（${status.relayBase || '同源'}，约 ${status.peers} 个客户端）` : '不可用'} ·
+              云端通道：{status.cloudOk ? `在线（${status.cloudChannel}）` : status.cloudChannel ? '配置了但连不上' : '未配置'} ·
+              局域网中继：{status.relayOk ? '在线' : '不可用'} ·
               本次已收发 {status.events} 条事件
             </small>
           </div>
         </div>
 
+        <div className="link-cloud">
+          <label>
+            云端通道（住户手机走蜂窝网络也能收到，推荐）
+            <input
+              type="text"
+              value={cloudChannel}
+              placeholder="ntfy:热感哨兵-xxxxx 或 https://你的中继域名"
+              onChange={(event) => setCloudChannel(event.target.value)}
+            />
+          </label>
+          <div className="link-cloud-actions">
+            <button type="button" onClick={() => setCloudChannel(makeCloudChannel())}>生成一个新通道</button>
+            <button type="button" className="primary" onClick={applyCloud}>保存云端通道</button>
+          </div>
+          <p className="situation-note">
+            <Server size={12} />
+            留空表示不用云端。通道就是"双方约定的暗号"：两端填同一个值即可互通；把上面的值（或下面二维码）给另一台设备扫一下就能配对。
+            {cloudInfo.mode === 'ntfy' ? '当前用 ntfy.sh 公共转发，零部署，适合原型演示。' : null}
+            {cloudInfo.mode === 'rest' ? '当前指向你自己的中继（协议见 tools/relay-server.mjs 与 tools/relay-worker.mjs）。' : null}
+          </p>
+          {cloudChannel && (
+            <textarea className="link-pair" rows={2} readOnly value={pairCode} onFocus={(event) => event.target.select()} />
+          )}
+        </div>
+
         <div className="link-relay">
           <label>
-            局域网中继地址（留空 = 当前站点同源）
+            局域网中继地址（可选，现场无互联网时的备用通道；留空 = 当前站点同源）
             <input
               type="text"
               value={relayBase}

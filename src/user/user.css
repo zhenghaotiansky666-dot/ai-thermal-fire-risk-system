@@ -659,6 +659,7 @@ p { margin: 0; }
 .link-status strong { font-size: 13px; }
 .link-status small { color: var(--text-3); font-size: 11px; }
 .link-status.level-lan { border-color: rgba(48, 209, 88, .45); background: rgba(48, 209, 88, .12); }
+.link-status.level-cloud { border-color: rgba(56, 189, 248, .5); background: rgba(14, 165, 233, .14); }
 .link-relay { display: flex; flex-direction: column; gap: 8px; }
 
 .plan-fields { display: flex; gap: 14px; flex-wrap: wrap; }
