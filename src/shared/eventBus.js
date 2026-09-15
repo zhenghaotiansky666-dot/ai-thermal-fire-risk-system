@@ -194,7 +194,8 @@ export function parseCloudChannel(value) {
     base: NTFY_BASE,
     publishUrl: `${NTFY_BASE}/${topic}`,
     pollUrl: `${NTFY_BASE}/${topic}/json`,
-    healthUrl: `${NTFY_BASE}/${topic}/json?poll=1&since=all`,
+    // 用主题信息端点做探测：比 since=all 轻得多，公共服务器不会因为探测就被限流
+    healthUrl: `${NTFY_BASE}/${topic}`,
   }
 }
 
@@ -232,7 +233,7 @@ export function createEventBus(options = {}) {
   const relayBase = (options.relayBase ?? readRelayBase()).replace(/\/$/, '')
   const pollMs = Number(options.pollMs) || 3000
   const cloudChannel = parseCloudChannel(options.cloudChannel ?? readCloudChannel())
-  const cloudPollMs = Number(options.cloudPollMs) || 3500
+  const cloudPollMs = Number(options.cloudPollMs) || 5000
   const listeners = new Set()
   const state = {
     level: 'local',
@@ -380,10 +381,16 @@ export function createEventBus(options = {}) {
     if (target.mode === 'off' || !state.cloudOk) return
     try {
       if (target.mode === 'ntfy') {
-        const since = state.cloudCursor || 'all'
+        // 第一次用 since=all 把当前会话接上，之后只按游标/时间取增量，避免公共服务的限流
+        const since = state.cloudCursor || (state.cloudPrimed ? Math.floor(Date.now() / 1000) : 'all')
         const response = await fetch(`${target.pollUrl}?poll=1&since=${encodeURIComponent(since)}`, { cache: 'no-store' })
-        if (!response.ok) return
+        if (!response.ok) {
+          // 被限流时退一步：改用时间游标，再过一轮就恢复正常
+          state.cloudPrimed = true
+          return
+        }
         const text = await response.text()
+        state.cloudPrimed = true
         text.split('\n').filter(Boolean).forEach((line) => {
           let record = null
           try {
