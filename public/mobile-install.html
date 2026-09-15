@@ -58,7 +58,7 @@
       <img class="qr" src="./download/qr-user.svg" alt="用户端二维码" />
       <p class="meta" style="text-align:center">扫一扫用手机打开</p>
       <a class="button" href="./user-app.html">打开用户端</a>
-      <a class="button secondary" href="./download/热感哨兵-用户端-安装.mobileconfig">iPhone 安装配置文件（.mobileconfig）</a>
+      <a class="button secondary" data-profile="./download/热感哨兵-用户端-安装.mobileconfig" href="./download/热感哨兵-用户端-安装.mobileconfig">iPhone 安装配置文件（.mobileconfig）</a>
     </section>
 
     <section class="card">
@@ -67,7 +67,7 @@
       <img class="qr" src="./download/qr-system.svg" alt="系统端二维码" />
       <p class="meta" style="text-align:center">扫一扫用手机打开</p>
       <a class="button" href="./mobile-app.html">打开系统端</a>
-      <a class="button secondary" href="./download/热感哨兵-系统端-安装.mobileconfig">iPhone 安装配置文件（.mobileconfig）</a>
+      <a class="button secondary" data-profile="./download/热感哨兵-系统端-安装.mobileconfig" href="./download/热感哨兵-系统端-安装.mobileconfig">iPhone 安装配置文件（.mobileconfig）</a>
     </section>
 
     <section class="card wide">
@@ -111,5 +111,33 @@
 
   <p class="meta" style="margin-top:22px">热感哨兵 · 澳门科技大学 · 本页仅用于科研演示原型安装。</p>
 </main>
+<script>
+  // iOS 对 .mobileconfig 的 MIME 有要求，而静态托管一般给的是 octet-stream。
+  // 这里用 fetch + Blob 重新按 application/x-apple-aspen-config 交给系统，识别率更高；
+  // 失败就退回普通链接下载（Safari 一样能装，只是可能多一次“下载”确认）。
+  document.querySelectorAll('a[data-profile]').forEach((link) => {
+    link.addEventListener('click', async (event) => {
+      const url = link.getAttribute('data-profile');
+      if (!url || !window.fetch || !window.Blob) return;
+      event.preventDefault();
+      try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error('http-' + response.status);
+        const buffer = await response.arrayBuffer();
+        const blob = new Blob([buffer], { type: 'application/x-apple-aspen-config' });
+        const objectUrl = URL.createObjectURL(blob);
+        const temporary = document.createElement('a');
+        temporary.href = objectUrl;
+        temporary.download = url.split('/').pop();
+        document.body.appendChild(temporary);
+        temporary.click();
+        temporary.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      } catch (error) {
+        window.location.href = url;
+      }
+    });
+  });
+</script>
 </body>
 </html>
