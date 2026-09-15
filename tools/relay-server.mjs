@@ -29,6 +29,22 @@ const TTL_MS = Number(readArg('--ttl-minutes', '60')) * 60 * 1000
 
 const stores = new Map() // topic -> { events, seq }
 const waiters = new Set() // { topic, since, reply, timer }
+const presence = new Map() // 来源 -> 最近活跃时间（用于"几台设备在线"）
+const PRESENCE_TTL_MS = 60 * 1000
+
+function touchClient(request) {
+  const forwarded = String(request.headers['x-forwarded-for'] ?? '').split(',')[0].trim()
+  const key = forwarded || request.socket?.remoteAddress || 'unknown'
+  presence.set(key, Date.now())
+}
+
+function clientCount() {
+  const cutoff = Date.now() - PRESENCE_TTL_MS
+  presence.forEach((seenAt, key) => {
+    if (seenAt < cutoff) presence.delete(key)
+  })
+  return presence.size
+}
 
 function storeFor(topic) {
   const key = topic || 'default'
@@ -80,9 +96,10 @@ createServer(async (request, response) => {
   }
 
   if (url.pathname === '/health') {
+    touchClient(request)
     const topic = url.searchParams.get('topic') || 'default'
     const store = storeFor(topic)
-    json(200, { ok: true, topic, events: store.events.length, seq: store.seq, topics: stores.size, uptimeSec: Math.round(process.uptime()) })
+    json(200, { ok: true, topic, events: store.events.length, seq: store.seq, topics: stores.size, clients: clientCount(), uptimeSec: Math.round(process.uptime()) })
     return
   }
 
@@ -108,6 +125,7 @@ createServer(async (request, response) => {
   }
 
   if (url.pathname === '/events' && request.method === 'GET') {
+    touchClient(request)
     const topic = url.searchParams.get('topic') || 'default'
     const store = storeFor(topic)
     const since = Number(url.searchParams.get('since')) || 0
@@ -116,6 +134,7 @@ createServer(async (request, response) => {
       ok: true,
       topic,
       cursor: String(store.seq),
+      clients: clientCount(),
       events: store.events.filter((item) => item.seq > since).map((item) => item.event),
     })
     if (store.seq > since || wait === 0) {

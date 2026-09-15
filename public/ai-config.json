@@ -5,12 +5,15 @@
     "baseUrl": "OpenAI 兼容端点，本地部署推荐相对路径 /ai/v1（配合 node tools/local-ai-server.mjs）",
     "model": "模型名，例如 qwen2.5:7b；读图用 qwen2.5-vl:7b",
     "vision": "该模型是否支持读图（用于复核用户上传的疏散路线图）",
-    "apiKey": "本地端点留空；云端服务才需要"
+    "apiKey": "本地端点留空；云端服务才需要",
+    "cloudChannel": "两边互通用的警报频道。原型可填 ntfy:主题名；部署了自己的中继就填 https://你的域名#分组名",
+    "areaChannels": "区域频道表（可选）：[{ id, label, channel, lat, lon, radiusMeters }]，用于“走到附近自动订阅”"
   },
   "provider": "offline",
   "baseUrl": "",
   "model": "",
   "vision": false,
   "apiKey": "",
+  "cloudChannel": "",
   "_notes": "改成实际端点后保存即可。示例：{ \"provider\": \"ollama\", \"baseUrl\": \"/ai/v1\", \"model\": \"qwen2.5:7b\" }"
 }

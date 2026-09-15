@@ -23,6 +23,7 @@ import {
   runVisionDetector,
   subscribeIntegrations,
 } from './aiHooks.js'
+import { readCloudChannel, saveCloudChannel } from './eventBus.js'
 
 export const AI_SETTINGS_KEY = 'thermalGuardAiSettings'
 
@@ -105,7 +106,7 @@ export function setExternalAiConfig(config) {
     return null
   }
   // 只取认识的字段，配置文件里的注释字段（_readme / _fields 等）不参与合并
-  const allowed = ['provider', 'baseUrl', 'model', 'apiKey', 'vision', 'timeoutMs']
+  const allowed = ['provider', 'baseUrl', 'model', 'apiKey', 'vision', 'timeoutMs', 'cloudChannel', 'areaChannels']
   const next = {}
   allowed.forEach((key) => {
     if (config[key] !== undefined) next[key] = config[key]
@@ -156,6 +157,22 @@ export async function bootstrapAiConfig() {
         if (config && typeof config === 'object') setExternalAiConfig(config)
       }
     } catch {}
+  }
+  // 云端通道也可以在配置文件里预置（例如部署好 Cloudflare Worker 后写进 ai-config.json），
+  // 用户本机手动填过的通道优先级更高，不会被覆盖。
+  const presetChannel = (typeof window !== 'undefined' && window.THERMAL_GUARD_CLOUD)
+    || getExternalAiConfig()?.cloudChannel
+    || ''
+  if (presetChannel && !readCloudChannel()) {
+    saveCloudChannel(String(presetChannel).trim())
+  }
+  // 区域频道表也可以由配置文件预置（例如"每个小区/楼栋一个频道"）
+  const presetAreas = getExternalAiConfig()?.areaChannels
+  if (Array.isArray(presetAreas) && presetAreas.length) {
+    const { readAreaChannels, saveAreaChannels } = await import('./geoChannels.js')
+    const current = readAreaChannels()
+    const isDefault = current.length === 1 && current[0]?.id === 'must-campus'
+    if (isDefault) saveAreaChannels(presetAreas)
   }
   installGlobalAiApi()
   return readAiSettings()
