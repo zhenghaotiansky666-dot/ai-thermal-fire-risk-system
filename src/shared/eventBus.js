@@ -406,12 +406,15 @@ export function createEventBus(options = {}) {
   async function pollCloud() {
     const target = cloudTarget()
     if (target.mode === 'off' || !state.cloudOk) return
+    // 公共转发偶尔会卡住：给每次轮询加超时，避免一条挂住的请求把整个循环拖死
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+    const timeout = setTimeout(() => controller?.abort(), cloudPollMs * 2 + 4000)
     try {
       if (target.mode === 'ntfy') {
         // 第一次用"最近 15 分钟"而不是 since=all：既能接上正在进行的演练，又不会被判为重量级查询；
         // 之后一律用消息 id 游标取增量（最省流量、最不容易被限流）。
         const since = state.cloudCursor || '15m'
-        const response = await fetch(withQuery(target.pollUrl, { poll: 1, since }), { cache: 'no-store' })
+        const response = await fetch(withQuery(target.pollUrl, { poll: 1, since }), { cache: 'no-store', signal: controller?.signal })
         if (!response.ok) {
           state.cloudFailures += 1
           if (state.cloudFailures >= 3) state.cloudOk = false
@@ -442,12 +445,17 @@ export function createEventBus(options = {}) {
         })
         return
       }
-      const response = await fetch(withQuery(target.pollUrl, { since: state.cloudCursor || '' }), { cache: 'no-store' })
+      const response = await fetch(withQuery(target.pollUrl, { since: state.cloudCursor || '' }), { cache: 'no-store', signal: controller?.signal })
       if (!response.ok) return
       const data = await response.json().catch(() => null)
       if (data?.cursor) state.cloudCursor = String(data.cursor)
       ;(data?.events ?? []).forEach((event) => emit(event))
-    } catch {}
+    } catch {
+      state.cloudFailures += 1
+      if (state.cloudFailures >= 3) state.cloudOk = false
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
   function start() {

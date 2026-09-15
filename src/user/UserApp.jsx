@@ -23,6 +23,7 @@ import {
 } from './binaryDialogue.js'
 import { createEvent, fireFromEvent, sharedEventBus } from '../shared/eventBus.js'
 import OfflineLink from './OfflineLink.jsx'
+import ScanSheet from './ScanSheet.jsx'
 import {
   isAutoJoinEnabled,
   readAreaChannels,
@@ -110,6 +111,7 @@ export default function UserApp() {
   const [hint, setHint] = useState('')
   const [arOpen, setArOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [scanOpen, setScanOpen] = useState(false)
   // GPS：按需开启，只在本机使用；室内楼层仍以信标或手动选点为准
   const gps = useGeoLocation()
   // 逃生路线图与 AI 指挥（路线图存在手机本地，AI 接口可插拔，无网络时用规则引擎）
@@ -731,7 +733,7 @@ export default function UserApp() {
       </main>
 
       <footer className="compass-tools">
-        <button type="button" onClick={toggleDrill} aria-pressed={Boolean(fire)}>{fire ? '结束演练' : '演练'}</button>
+        <button type="button" className="tool-scan" onClick={() => setScanOpen(true)}>演练</button>
         <button type="button" onClick={() => setSheetOpen(true)}>我的位置</button>
         <button type="button" className="tool-ar" onClick={() => setArOpen(true)}>AR</button>
         <button type="button" onClick={() => setMoreOpen(true)}>更多</button>
@@ -776,6 +778,17 @@ export default function UserApp() {
           onImportEvent={applyIncomingEvent}
           onReport={publishUserReport}
           onClose={() => setMoreOpen(false)}
+        />
+      )}
+
+      {scanOpen && (
+        <ScanSheet
+          fireActive={Boolean(fire)}
+          onClose={() => setScanOpen(false)}
+          onJoined={(channel) => {
+            setLinkNotice(`已加入系统端演练频道（${channel}）`)
+          }}
+          onSelfDrill={toggleDrill}
         />
       )}
 

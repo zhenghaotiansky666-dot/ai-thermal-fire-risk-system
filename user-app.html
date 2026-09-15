@@ -14,7 +14,42 @@
     <title>逃生指引 · 热感哨兵</title>
   </head>
   <body>
-    <div id="user-root"></div>
+    <div id="user-root">
+      <div id="tg-boot" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#f2f2f7;font:15px/1.7 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-align:center;padding:24px">
+        <div>
+          <div style="font-size:17px;font-weight:600;margin-bottom:8px">热感哨兵 · 逃生指引</div>
+          <div style="color:#8e8e93">正在加载…</div>
+        </div>
+      </div>
+    </div>
+    <noscript>
+      <div style="padding:28px;background:#000;color:#f2f2f7;font:15px/1.7 -apple-system,'PingFang SC',sans-serif">
+        本页需要开启 JavaScript 才能显示逃生指引。请在浏览器设置中允许 JavaScript 后重新打开。
+      </div>
+    </noscript>
+    <script>
+      // 白屏兜底：脚本加载失败、模块报错或长时间没渲染出内容时，给出可操作的提示，
+      // 而不是让用户只看到一片空白（手机网络受限时最常见）。
+      (function () {
+        var boot = document.getElementById('tg-boot')
+        function show(title, detail) {
+          if (!boot || window.__tgReady) return
+          boot.innerHTML = '<div style="max-width:320px">'
+            + '<div style="font-size:17px;font-weight:600;margin-bottom:8px">' + title + '</div>'
+            + '<div style="color:#8e8e93;margin-bottom:16px">' + detail + '</div>'
+            + '<button onclick="location.reload(true)" style="min-height:46px;padding:0 20px;border-radius:12px;border:none;background:#0a84ff;color:#fff;font-size:15px;font-weight:600">重新加载</button>'
+            + '</div>'
+          boot.style.cssText = 'min-height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#f2f2f7;font:15px/1.7 -apple-system,"PingFang SC",sans-serif;text-align:center;padding:24px'
+        }
+        window.__tgShowBootError = show
+        window.addEventListener('error', function () {
+          show('页面加载失败', '可能是网络受限或缓存不完整。请检查网络后重试，或稍后再打开。')
+        }, true)
+        window.setTimeout(function () {
+          show('加载较慢', '网络似乎不太顺畅。可以点下面重新加载，或换一个网络再试。')
+        }, 9000)
+      })()
+    </script>
     <script type="module" src="/src/user/main.jsx"></script>
   </body>
 </html>

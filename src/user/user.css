@@ -225,6 +225,9 @@ p { margin: 0; }
   font-weight: 400;
 }
 .compass-tools button:active { opacity: .5; }
+/* 左下角「演练」其实是"扫一扫加入系统端演练"，给它一点强调色，现场一眼能找到 */
+.compass-tools button.tool-scan { color: #0a84ff; font-weight: 600; }
+.compass-app.is-alert .compass-tools button.tool-scan { color: #fff; }
 
 .compass-toast {
   position: fixed;
@@ -638,6 +641,69 @@ p { margin: 0; }
 }
 .link-note.is-report { border-color: rgba(48, 209, 88, .45); background: rgba(48, 209, 88, .14); }
 .link-note.is-area { border-color: rgba(56, 189, 248, .45); background: rgba(14, 165, 233, .14); }
+
+/* ==== 用户端左下角「演练 · 扫一扫」 ==== */
+.scan-sheet-user {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* 面板自身不超过屏幕，标题与页签固定，只有中间区域滚动 —— 手机小屏也能稳定点中页签 */
+  max-height: 86vh;
+  overflow: hidden;
+}
+.scan-user-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex: 0 0 auto; }
+.scan-user-head > div { display: flex; flex-direction: column; gap: 3px; }
+.scan-user-head span { color: var(--text-3); font-size: 11px; letter-spacing: .16em; }
+.scan-user-head strong { font-size: 16px; }
+.scan-user-head button {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 10px; border: 1px solid rgba(120,128,140,.4); background: rgba(120,128,140,.16); color: var(--text-2);
+}
+.scan-user-tabs { display: flex; gap: 8px; flex: 0 0 auto; }
+.scan-user-tabs button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; border-radius: 12px; border: 1px solid rgba(120,128,140,.4);
+  background: rgba(120,128,140,.14); color: var(--text-2); font-size: 13px;
+}
+.scan-user-tabs button.active { border-color: rgba(10,132,255,.55); background: rgba(10,132,255,.18); color: var(--text); font-weight: 600; }
+.scan-user-body { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.scan-user-stage {
+  position: relative; overflow: hidden; aspect-ratio: 4 / 3; max-height: 38vh; border-radius: 16px;
+  border: 1px solid rgba(120,128,140,.35); background: #000;
+  flex: 0 0 auto;
+}
+.scan-user-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-user-placeholder {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 20px; text-align: center; color: var(--text-3);
+}
+.scan-user-placeholder p { margin: 0; font-size: 13px; line-height: 1.6; }
+.scan-user-frame { position: absolute; left: 50%; top: 50%; width: 62%; height: 62%; transform: translate(-50%,-50%); border: 2px solid rgba(10,132,255,.85); border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,.35); }
+.scan-user-frame i { position: absolute; width: 20px; height: 20px; border-color: #30d158; border-style: solid; border-width: 0; left: -2px; top: -2px; border-left-width: 4px; border-top-width: 4px; border-top-left-radius: 12px; }
+.scan-user-beam { position: absolute; left: 8%; right: 8%; top: 12%; height: 3px; border-radius: 999px; background: linear-gradient(90deg, transparent, #30d158, transparent); animation: scanBeamUser 2s ease-in-out infinite; }
+@keyframes scanBeamUser { 0%,100% { top: 12%; } 50% { top: 84%; } }
+.scan-user-primary, .scan-user-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; border-radius: 14px; border: 1px solid transparent; font-size: 15px; font-weight: 600;
+}
+.scan-user-primary { background: linear-gradient(110deg, #0a84ff, #38bdf8); color: #fff; }
+.scan-user-secondary { background: rgba(120,128,140,.18); border-color: rgba(120,128,140,.4); color: var(--text-2); }
+.scan-user-field { display: flex; flex-direction: column; gap: 6px; color: var(--text-3); font-size: 12px; }
+.scan-user-field textarea {
+  padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(120,128,140,.4);
+  background: rgba(120,128,140,.16); color: var(--text); font-size: 13px; line-height: 1.5; resize: vertical;
+}
+.scan-user-message { padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,179,64,.4); background: rgba(255,179,64,.14); color: var(--text); font-size: 12px; line-height: 1.6; }
+.scan-user-self { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 14px; border: 1px solid rgba(120,128,140,.3); background: rgba(120,128,140,.1); flex: 0 0 auto; }
+.scan-user-self > div { display: flex; flex-direction: column; gap: 4px; }
+.scan-user-self strong { font-size: 13px; }
+.scan-user-self small { color: var(--text-3); font-size: 11px; line-height: 1.5; }
+.scan-user-self button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+  border-radius: 12px; border: 1px solid rgba(120,128,140,.4); background: rgba(120,128,140,.16); color: var(--text); font-size: 13px;
+}
+.scan-user-refresh { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; border: none; background: none; color: var(--text-3); font-size: 12px; flex: 0 0 auto; }
+.scan-user-message { flex: 0 0 auto; }
 .link-tag { color: var(--text-2); font-size: 11px; letter-spacing: .3px; }
 
 /* ==== 离线联通面板 ==== */

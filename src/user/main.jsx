@@ -22,6 +22,8 @@ bootstrapAiConfig().finally(() => {
       <UserApp />
     </React.StrictMode>
   )
+  // 标记渲染成功：白屏兜底脚本看到这个标记就不再弹"加载失败"
+  window.__tgReady = true
 })
 
 // 线上更新：装了主屏图标的用户下次打开会自动拿到新版本，这里额外给一个可见提示

@@ -1,4 +1,4 @@
-const CACHE = 'thermal-guard-v8'
+const CACHE = 'thermal-guard-v9'
 // 逃生指引页与它的 manifest 必须预缓存：断网时用户最需要这个页面
 const CORE = ['./', './index.html', './mobile-app.html', './user-app.html', './mobile-install.html', './demo-center.html', './thermal-guard.mobileconfig', './ai-config.json', './demo-live.gif', './manifest.webmanifest', './manifest-user.webmanifest', './apple-touch-icon.png', './icon-192.png', './icon-512.png', './download/qr-user.svg', './download/qr-system.svg', './download/热感哨兵-用户端-安装.mobileconfig', './download/热感哨兵-系统端-安装.mobileconfig']
 const SHELLS = ['./index.html', './mobile-app.html', './user-app.html']
@@ -69,15 +69,38 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response.ok && new URL(event.request.url).origin === self.location.origin) {
-          const copy = response.clone()
-          caches.open(CACHE).then(cache => cache.put(event.request, copy))
-        }
-        return response
-      })
-      .catch(() => caches.match(event.request))
-  )
+  const isSameOrigin = requestUrl.origin === self.location.origin
+  const isNavigation = event.request.mode === 'navigate'
+
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(event.request)
+      if (response.ok && isSameOrigin) {
+        const copy = response.clone()
+        caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(() => {})
+      }
+      return response
+    } catch (error) {
+      // 网络不可用（手机信号差、被墙）时的兜底：依次尝试
+      //   1) 完全相同的 URL（含 ?ch= 等查询参数）
+      //   2) 去掉查询参数的同路径页面
+      //   3) 该端点的主页面
+      // 这样"装了主屏图标但网络不好"不会再出现白屏。
+      const exact = await caches.match(event.request)
+      if (exact) return exact
+      if (isSameOrigin) {
+        const withoutQuery = await caches.match(requestUrl.origin + requestUrl.pathname)
+        if (withoutQuery) return withoutQuery
+        const scope = self.registration.scope
+        const shellUser = await caches.match(new URL('./user-app.html', scope).href)
+        const shellSystem = await caches.match(new URL('./mobile-app.html', scope).href)
+        const shell = requestUrl.pathname.includes('mobile-app')
+          ? (shellSystem ?? shellUser)
+          : (shellUser ?? shellSystem)
+        if (shell) return shell
+        if (isNavigation && shellUser) return shellUser
+      }
+      throw error
+    }
+  })())
 })

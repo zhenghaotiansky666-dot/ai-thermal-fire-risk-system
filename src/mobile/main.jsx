@@ -20,6 +20,7 @@ bootstrapAiConfig().finally(() => {
       <MobileApp />
     </React.StrictMode>
   )
+  window.__tgReady = true
 })
 
 // 线上更新提示（与用户端同一套机制）
