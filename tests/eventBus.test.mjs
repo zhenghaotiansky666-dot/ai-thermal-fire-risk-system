@@ -85,6 +85,7 @@ console.log('[4b] 云端通道解析')
   check('ntfy 模式识别主题', ntfy.mode === 'ntfy' && ntfy.topic === 'tg-abc123')
   check('ntfy 发布地址正确', ntfy.publishUrl === 'https://ntfy.sh/tg-abc123')
   check('ntfy 轮询地址正确', ntfy.pollUrl === 'https://ntfy.sh/tg-abc123/json')
+  check('ntfy 探测走带 CORS 的 json 端点，且只用 30 秒窗口', ntfy.healthUrl.includes('/json?poll=1&since=30s'))
 
   const bare = parseCloudChannel('tg-abc123')
   check('不带前缀也按 ntfy 处理', bare.mode === 'ntfy' && bare.topic === 'tg-abc123')

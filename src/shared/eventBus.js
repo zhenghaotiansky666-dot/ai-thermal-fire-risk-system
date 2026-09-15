@@ -194,8 +194,10 @@ export function parseCloudChannel(value) {
     base: NTFY_BASE,
     publishUrl: `${NTFY_BASE}/${topic}`,
     pollUrl: `${NTFY_BASE}/${topic}/json`,
-    // 用主题信息端点做探测：比 since=all 轻得多，公共服务器不会因为探测就被限流
-    healthUrl: `${NTFY_BASE}/${topic}`,
+    // 探测用 /json 端点的"最近 30 秒"查询：
+    //   · 这个端点带 CORS 头（单纯的主题信息端点不带，浏览器会被拦）
+    //   · 只取 30 秒窗口，比 since=all 轻得多，不容易触发公共服务的限流
+    healthUrl: `${NTFY_BASE}/${topic}/json?poll=1&since=30s`,
   }
 }
 
@@ -353,7 +355,8 @@ export function createEventBus(options = {}) {
     }
     try {
       const response = await fetch(target.healthUrl, { cache: 'no-store' })
-      state.cloudOk = response.ok
+      // 429 = 公共中继限流（端点本身是通的），照样算"可达"，随后按游标增量取数即可
+      state.cloudOk = response.ok || response.status === 429
     } catch {
       state.cloudOk = false
     }
