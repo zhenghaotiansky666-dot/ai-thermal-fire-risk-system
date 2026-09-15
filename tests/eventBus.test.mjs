@@ -10,6 +10,7 @@ import {
   fireFromEvent,
   isExpired,
   mergeEvents,
+  peerReportSummary,
 } from '../src/shared/eventBus.js'
 
 let failures = 0
@@ -82,6 +83,19 @@ console.log('[5] 火情事件 → 传感器结构')
   check('startedAt 优先用火情里的时间', multi.startedAt === 123)
   check('缺少 nodeId 时返回 null', fireFromEvent(createEvent('fire', { floor: 4 })) === null)
   check('非火情事件返回 null', fireFromEvent(createEvent('notice', {})) === null)
+}
+
+console.log('[6] 用户端上报 → 系统端横幅摘要')
+{
+  const fire = peerReportSummary(createEvent('report', { floor: 4, spot: 'C', text: '我这里看到明火或浓烟' }, { at: 5000, from: 'user' }))
+  check('识别为疑似火情', fire.severity === 'fire' && fire.fireSeen === true)
+  check('摘要带楼层与位置', fire.place.includes('4 楼') && fire.place.includes('C'))
+  check('摘要给出提示标签', fire.label.includes('疑似火情'))
+
+  const help = peerReportSummary(createEvent('report', { floor: 6, spot: 'A', text: '我走不动了，需要帮助' }, { at: 6000, from: 'user' }))
+  check('普通求助不误判成火情', help.severity === 'help' && help.fireSeen === false)
+  check('缺楼层时不崩', peerReportSummary(createEvent('report', { text: '有烟' })).place.includes('楼层未知'))
+  check('非 report 事件返回 null', peerReportSummary(createEvent('fire', { nodeId: 'C4' })) === null)
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

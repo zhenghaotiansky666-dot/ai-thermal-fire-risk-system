@@ -71,6 +71,30 @@ export function fireFromEvent(event) {
   }
 }
 
+// 用户端上报 → 系统端横幅用的摘要（纯函数，便于单测）
+// 区分"看到明火"（疑似火情，系统端应优先处置）与一般求助/隐患。
+const FIRE_WORDS = ['明火', '火光', '着火', '起火', '冒烟', '浓烟', '看到火']
+
+export function peerReportSummary(event) {
+  if (!event || event.kind !== 'report') return null
+  const payload = event.payload ?? {}
+  const text = String(payload.text ?? payload.notice ?? '').trim()
+  const fireSeen = FIRE_WORDS.some((word) => text.includes(word))
+  const floor = payload.floor ?? null
+  const spot = payload.spot ?? null
+  return {
+    id: event.id,
+    at: event.at,
+    floor,
+    spot,
+    text: text || '用户端上报火源或异常',
+    fireSeen,
+    severity: fireSeen ? 'fire' : 'help',
+    label: fireSeen ? '疑似火情（用户上报）' : '用户求助（用户上报）',
+    place: `${floor ? `${floor} 楼` : '楼层未知'}${spot ? ` · ${spot} 位置` : ''}`,
+  }
+}
+
 // ---------------------------------------------------------------- 纯函数：离线码
 // 离线码 = 版本前缀 + base64url(JSON)。做了字符替换，方便手机扫码与人工粘贴。
 function toBase64Url(text) {

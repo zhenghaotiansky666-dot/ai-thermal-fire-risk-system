@@ -65,7 +65,7 @@ import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from '
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
 import LinkSheet from './LinkSheet.jsx'
-import { createEvent, fireFromEvent, sharedEventBus } from '../shared/eventBus.js'
+import { createEvent, fireFromEvent, peerReportSummary, sharedEventBus } from '../shared/eventBus.js'
 import CityMap from './CityMap.jsx'
 import EvacuationView from './EvacuationView.jsx'
 import { SPOT_MAPPING_NOTE, campusLocationForNode } from './campus.js'
@@ -780,6 +780,8 @@ export default function MobileApp() {
   const [rescueBrief, setRescueBrief] = useState(null)
   const [showLinkSheet, setShowLinkSheet] = useState(false)
   const [peerEvents, setPeerEvents] = useState([])
+  // 最近一条"还没处置"的用户端上报（系统端横幅用它提醒指挥人员）
+  const [peerReport, setPeerReport] = useState(null)
   const firePublishedRef = useRef(false)
   const [phase, setPhase] = useState(0)
   const [frame, setFrame] = useState(() => createFrame())
@@ -899,7 +901,9 @@ export default function MobileApp() {
       if (event.kind === 'report' || event.kind === 'status') {
         setPeerEvents((current) => [...current.filter((item) => item.id !== event.id), event].slice(-12))
         if (event.kind === 'report') {
-          setToast(`用户端上报：${event.payload?.floor ?? '?'} 楼 ${event.payload?.spot ?? ''} · ${event.payload?.text ?? '火源/异常'}`)
+          const summary = peerReportSummary(event)
+          setToast(`用户端上报：${summary?.place ?? ''} · ${summary?.text ?? ''}`)
+          setPeerReport(summary)
         }
       }
     })
@@ -1630,6 +1634,56 @@ export default function MobileApp() {
           <span>{alarm.acknowledged ? '报警已静音，危险未解除' : '火警报警进行中'}</span>
           <strong>返回警报</strong>
         </button>
+      )}
+
+      {/* 用户端上报：指挥人员在这里一眼看到位置与内容，并可定位或直接拉响警报 */}
+      {peerReport && !alarm && (
+        <div className={`peer-report tone-${peerReport.severity}`}>
+          <div className="peer-report-head">
+            <span className="peer-report-tag">{peerReport.label}</span>
+            <small>{new Date(peerReport.at).toLocaleTimeString('zh-CN', { hour12: false })} · 来自用户端</small>
+          </div>
+          <strong>{peerReport.place}</strong>
+          <p>{peerReport.text}</p>
+          <div className="peer-report-actions">
+            <button
+              type="button"
+              className="peer-report-locate"
+              onClick={() => {
+                if (peerReport.floor) {
+                  setPosition((current) => ({ floor: peerReport.floor, spot: peerReport.spot && ['A', 'C', 'B'].includes(peerReport.spot) ? peerReport.spot : current.spot }))
+                }
+                setActiveTab('evacuation')
+                setToast(`已定位到上报位置：${peerReport.place}`)
+              }}
+            >
+              <MapPin size={14} />定位到该位置
+            </button>
+            <button
+              type="button"
+              className="peer-report-alarm"
+              onClick={() => {
+                const floor = peerReport.floor ?? position.floor
+                const spot = peerReport.spot && ['A', 'C', 'B'].includes(peerReport.spot) ? peerReport.spot : position.spot
+                const startedAt = Date.now()
+                setPosition({ floor, spot })
+                setFire({ nodeId: positionNodeId(floor, spot), floor, startedAt, mode: 'live' })
+                pushAlarm({
+                  mode: 'live',
+                  startedAt,
+                  temp: result.maxTemp,
+                  hotspots: 0,
+                  location: `用户端上报：${floor} 楼${SPOT_LABELS[spot] || ''}`,
+                  sourceLabel: '用户端上报',
+                })
+                setPeerReport(null)
+              }}
+            >
+              <ShieldAlert size={14} />确认火情并拉响警报
+            </button>
+            <button type="button" onClick={() => setPeerReport(null)}>先忽略</button>
+          </div>
+        </div>
       )}
 
       {notice && !alarm && (

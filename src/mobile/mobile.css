@@ -1915,6 +1915,44 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .link-received-row strong { color: #d9ecfb; font-size: 9px; }
 .link-received-row small { color: #6f8aa5; font-size: 8px; }
 
+/* ==== 用户端上报横幅（系统端） ==== */
+.peer-report {
+  margin: 8px 12px 0;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(245, 158, 11, .4);
+  background: rgba(245, 158, 11, .14);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.peer-report.tone-fire { border-color: rgba(239, 68, 68, .5); background: rgba(239, 68, 68, .16); }
+.peer-report-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.peer-report-tag { color: #ffd7a8; font-size: 10px; font-weight: 700; }
+.peer-report.tone-fire .peer-report-tag { color: #ffd3d3; }
+.peer-report-head small { color: #8fa9c2; font-size: 8px; }
+.peer-report strong { color: #f2f7fd; font-size: 12px; }
+.peer-report p { margin: 0; color: #cfe0f0; font-size: 10px; line-height: 1.5; }
+.peer-report-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.peer-report-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 11px;
+  color: #dcecff;
+  border: 1px solid rgba(96, 165, 250, .24);
+  border-radius: 10px;
+  background: rgba(59, 130, 246, .14);
+  font-size: 9px;
+}
+.peer-report-actions .peer-report-alarm {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(110deg, #b91c1c, #ef4444);
+  font-weight: 700;
+}
+
 .ai-sheet { display: flex; flex-direction: column; gap: 10px; }
 .ai-sheet-field {
   display: flex;
