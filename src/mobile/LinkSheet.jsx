@@ -118,7 +118,7 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
             <strong>{status.label}</strong>
             <small>
               云端通道：{status.cloudOk ? `在线（${status.cloudChannel}）` : status.cloudChannel ? '配置了但连不上' : '未配置'} ·
-              局域网中继：{status.relayOk ? '在线' : '不可用'} ·
+              局域网中继：{status.relayOk ? `在线${status.peers ? `（${status.peers} 台设备）` : ''}` : '不可用'} ·
               本次已收发 {status.events} 条事件
             </small>
           </div>

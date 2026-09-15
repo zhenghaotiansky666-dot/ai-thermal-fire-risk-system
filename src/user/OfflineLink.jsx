@@ -143,7 +143,7 @@ export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, o
           <strong>{describeTransport(status.level)}</strong>
           <small>
             云端通道：{status.cloudOk ? '在线' : status.cloudChannel ? '配置了但连不上' : '未配置'} ·
-            局域网：{status.relayOk ? '在线' : '不可用'} · 已收发 {status.events} 条
+            局域网：{status.relayOk ? `在线${status.peers ? `（${status.peers} 台设备）` : ''}` : '不可用'} · 已收发 {status.events} 条
           </small>
         </div>
       </div>

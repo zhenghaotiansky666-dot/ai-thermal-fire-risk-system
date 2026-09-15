@@ -21,6 +21,7 @@ import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
 import { extname, join, normalize, resolve } from 'node:path'
+import { createRequire } from 'node:module'
 
 const args = process.argv.slice(2)
 const readArg = (name, fallback) => {
@@ -43,6 +44,23 @@ function lanAddresses() {
     })
   })
   return result
+}
+
+// 演示时最常用的地址：优先取第一个局域网 IPv4
+function primaryLanAddress() {
+  return lanAddresses()[0] ?? '127.0.0.1'
+}
+
+// 终端里直接打印二维码，比赛现场扫一下就进用户端（评委不用输网址）
+async function printJoinQr(url) {
+  try {
+    const require = createRequire(import.meta.url)
+    const QRCode = require('qrcode')
+    const ascii = await QRCode.toString(url, { type: 'terminal', small: true, margin: 1 })
+    console.log(ascii)
+  } catch {
+    console.log(`（未安装 qrcode 包，跳过二维码打印；直接访问 ${url} 也可以）`)
+  }
 }
 
 const MIME = {
@@ -110,7 +128,24 @@ async function proxyAi(request, response) {
 
 // ---------------------------------------------------------------- 局域网事件中继
 // 目的：火场里可能没有互联网；只要手机和指挥端连在同一个现场热点上，就能互通。
-const relay = { events: [], waiters: new Set(), clients: 0 }
+const relay = { events: [], waiters: new Set(), presence: new Map() }
+
+// 在线设备统计：按"最近 60 秒还在轮询/操作"的来源计数，演示时能直接报出"几台设备在线"
+const PRESENCE_TTL_MS = 60 * 1000
+
+function touchClient(request) {
+  const forwarded = String(request.headers['x-forwarded-for'] ?? '').split(',')[0].trim()
+  const key = forwarded || request.socket?.remoteAddress || 'unknown'
+  relay.presence.set(key, Date.now())
+}
+
+function clientCount() {
+  const cutoff = Date.now() - PRESENCE_TTL_MS
+  relay.presence.forEach((seenAt, key) => {
+    if (seenAt < cutoff) relay.presence.delete(key)
+  })
+  return relay.presence.size
+}
 
 function pushEvent(event) {
   if (!event || !event.id) return null
@@ -127,7 +162,7 @@ function pushEvent(event) {
     relay.waiters.delete(waiter)
     waiter.reply()
   })
-  console.log(`[relay] 事件 ${event.kind} id=${event.id} 已广播（客户端 ${relay.clients}）`)
+  console.log(`[relay] 事件 ${event.kind} id=${event.id} 已广播（在线设备 ${clientCount()} 台，等待者 ${relay.waiters.size}）`)
   return record
 }
 
@@ -135,7 +170,7 @@ async function handleRelay(request, response, url) {
   const corsHeaders = { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }
   if (url.pathname === '/sync/health') {
     response.writeHead(200, corsHeaders)
-    response.end(JSON.stringify({ ok: true, clients: relay.clients, events: relay.events.length, seq: relay.events.length, uptimeSec: Math.round(process.uptime()) }))
+    response.end(JSON.stringify({ ok: true, clients: clientCount(), events: relay.events.length, seq: relay.events.length, uptimeSec: Math.round(process.uptime()) }))
     return
   }
   if (url.pathname === '/sync/publish' && request.method === 'POST') {
@@ -155,12 +190,13 @@ async function handleRelay(request, response, url) {
     return
   }
   if (url.pathname === '/sync/events' && request.method === 'GET') {
+    touchClient(request)
     const since = Number(url.searchParams.get('since')) || 0
     const wait = Math.max(0, Math.min(25000, Number(url.searchParams.get('wait')) || 0))
     const reply = () => {
       const events = relay.events.filter((item) => item.seq > since).map((item) => item.event)
       response.writeHead(200, corsHeaders)
-      response.end(JSON.stringify({ ok: true, seq: relay.events.length, clients: relay.clients, events }))
+      response.end(JSON.stringify({ ok: true, seq: relay.events.length, clients: clientCount(), events }))
     }
     if (relay.events.length > since || wait === 0) {
       reply()
@@ -178,6 +214,67 @@ async function handleRelay(request, response, url) {
   response.end(JSON.stringify({ ok: false, error: 'unknown-sync-endpoint' }))
 }
 
+// 比赛演示用的「扫码加入」页：二维码指向本机的局域网地址，评委手机扫一下就进用户端
+async function serveJoinPage(response, port) {
+  const lanHost = primaryLanAddress()
+  const userUrl = `http://${lanHost}:${port}/user-app.html`
+  const systemUrl = `http://${lanHost}:${port}/mobile-app.html`
+  let userQr = ''
+  let systemQr = ''
+  try {
+    const require = createRequire(import.meta.url)
+    const QRCode = require('qrcode')
+    userQr = await QRCode.toString(userUrl, { type: 'svg', margin: 1, width: 260 })
+    systemQr = await QRCode.toString(systemUrl, { type: 'svg', margin: 1, width: 260 })
+  } catch {
+    userQr = '<p>未安装 qrcode 包，无法生成二维码</p>'
+  }
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>扫码加入 · 热感哨兵现场演示</title>
+  <style>
+    body{margin:0;min-height:100vh;background:#06101f;color:#f3f8ff;font-family:-apple-system,"PingFang SC",sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
+    main{width:min(760px,100%);display:grid;gap:18px}
+    h1{font-size:26px;margin:0}
+    p{color:#8ea5c2;line-height:1.75;margin:0;font-size:13px}
+    .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(max-width:620px){.cards{grid-template-columns:1fr}}
+    .card{padding:18px;border:1px solid rgba(96,165,250,.2);border-radius:18px;background:linear-gradient(145deg,rgba(21,38,64,.9),rgba(7,16,31,.92))}
+    .card strong{display:block;margin-bottom:8px;font-size:15px}
+    .qr{width:100%;max-width:260px;background:#fff;border-radius:12px;padding:8px;display:block;margin:10px auto}
+    code{color:#93c5fd;word-break:break-all;font-size:12px}
+    .steps{margin:0;padding-left:18px;color:#8ea5c2;font-size:12px;line-height:1.8}
+  </style></head><body><main>
+    <h1>热感哨兵 · 现场演示入口</h1>
+    <p>本页由演示电脑（本机）提供，手机连同一个 Wi-Fi/热点后扫码即可进入。<strong>不需要互联网，也不需要装任何 App。</strong></p>
+    <div class="cards">
+      <section class="card">
+        <strong>① 评委手机扫这个（用户端）</strong>
+        ${userQr}
+        <p><code>${userUrl}</code></p>
+      </section>
+      <section class="card">
+        <strong>② 指挥端/物业端扫这个（系统端）</strong>
+        ${systemQr}
+        <p><code>${systemUrl}</code></p>
+      </section>
+    </div>
+    <section class="card">
+      <strong>演示流程（约 60 秒）</strong>
+      <ol class="steps">
+        <li>手机扫码进入用户端 → 页面显示「当前无火警」，底部有表盘与「更多」。</li>
+        <li>演示电脑打开系统端 →「预警 → 报警设置 → 开始演练」（或直接点顶栏的演示流程）。</li>
+        <li>手机立刻进入火警态：表盘转向、距离与楼层更新、顶部出现「火警通报 · 来自系统端 … 发生火情」。</li>
+        <li>手机点「更多 → 离线联通 → 一键上报看到火」→ 系统端弹出「疑似火情（用户上报）」横幅，可一键拉响警报。</li>
+        <li>系统顶点「链路」可以看到当前通道与在线设备数（现场通常显示 2–3 台）。</li>
+      </ol>
+      <p style="margin-top:10px">通道说明：同一网络下自动走本机中继（<code>/sync</code>），不消耗流量、不需要账号；若要演示"住户在自家网络收到"，改用云端通道（<code>ntfy:…</code> 或自建中继域名）。</p>
+    </section>
+  </main></body></html>`
+  response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+  response.end(html)
+}
+
 createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`)
   if (request.method === 'OPTIONS') {
@@ -187,6 +284,10 @@ createServer(async (request, response) => {
   }
   if (url.pathname.startsWith('/sync/')) {
     await handleRelay(request, response, url)
+    return
+  }
+  if (url.pathname === '/join' || url.pathname === '/join.html') {
+    await serveJoinPage(response, port)
     return
   }
   if (url.pathname === '/ai' || url.pathname.startsWith('/ai/')) {
@@ -201,5 +302,9 @@ createServer(async (request, response) => {
   })
   console.log(`本地大模型代理：/ai/*  →  ${upstream}`)
   console.log(`局域网事件中继：/sync/*  （手机连现场热点后打开 http://<本机局域网IP>:${port}/ 即可互通，不需要互联网）`)
+  console.log(`扫码加入页（评委手机扫码进用户端）：http://127.0.0.1:${port}/join`)
   console.log('在页面「AI 指挥」里把端点填成 /ai/v1 即可，断网也能用。')
+  console.log('')
+  console.log('现场演示：手机扫下面这个二维码即可进入用户端（需与演示电脑在同一网络）')
+  printJoinQr(`http://${primaryLanAddress()}:${port}/user-app.html`)
 })
