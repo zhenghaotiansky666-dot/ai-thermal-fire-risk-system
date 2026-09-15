@@ -1,0 +1,19 @@
+# Cloudflare Worker 中继配置（免费额度即可）
+#
+# 部署步骤（在你自己的电脑上执行，账号必须由你本人注册）：
+#   1) 安装并登录：npm i -g wrangler && wrangler login
+#   2) 建 KV：      wrangler kv namespace create TG_EVENTS
+#      把返回的 id 填到下面 kv_namespaces.id
+#   3) 部署：      wrangler deploy tools/relay-worker.mjs --config tools/wrangler.toml
+#   4) 前端「云端通道」填：https://<你的 workers 子域>.workers.dev#campus
+#
+# 免费子域（*.workers.dev）是 Cloudflare 免费送的，不需要买域名；
+# 如果想用 aifiredetection.xxx 这样的自定义域名，需要在 Cloudflare 注册该域名（约 $10/年）。
+
+name = "thermal-guard-relay"
+main = "relay-worker.mjs"
+compatibility_date = "2026-09-01"
+
+kv_namespaces = [
+  { binding = "TG_EVENTS", id = "REPLACE_WITH_KV_NAMESPACE_ID" }
+]
