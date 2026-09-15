@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ThermalGuard" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#06101F</item>
+        <item name="android:navigationBarColor">#06101F</item>
+        <item name="android:windowBackground">#06101F</item>
+    </style>
+</resources>

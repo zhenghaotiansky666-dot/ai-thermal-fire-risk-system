@@ -88,7 +88,11 @@
         <li>右上角菜单里选 <strong>“安装应用 / 添加到主屏幕”</strong>；有的机型会直接弹出安装提示。</li>
         <li>安装后从桌面图标打开，全屏运行、支持离线打开逃生页。</li>
       </ol>
-      <p class="meta">Android 不需要配置文件；如果你们要正式商店版本，可后续用 Android Studio 把同一个网址打成 TWA/APK。</p>
+      <p class="meta">
+        安卓没有 iPhone 那种“描述文件”；要一个<strong>能下载分发的安装包（APK）</strong>，
+        仓库里已经准备好 TWA 工程：<code>android-twa/</code>（Android Studio 打开点 Build APK，或命令行
+        <code>./gradlew assembleRelease</code>），产物可直接发给住户安装。网页更新后 App 不用重新发版。
+      </p>
     </section>
 
     <section class="card wide">

@@ -13,6 +13,7 @@ import {
   makeCloudChannel,
   parseCloudChannel,
   peerReportSummary,
+  withQuery,
 } from '../src/shared/eventBus.js'
 
 let failures = 0
@@ -93,6 +94,14 @@ console.log('[4b] 云端通道解析')
   const rest = parseCloudChannel('https://relay.example.com/')
   check('自定义中继走 rest 模式', rest.mode === 'rest' && rest.publishUrl === 'https://relay.example.com/events')
   check('自定义中继健康检查地址', rest.healthUrl === 'https://relay.example.com/health')
+  check('不分组时没有 topic 参数', !rest.publishUrl.includes('topic='))
+
+  const scoped = parseCloudChannel('https://relay.example.com#building-a')
+  check('用 #分组 区分小区/楼栋', scoped.topic === 'building-a' && scoped.publishUrl === 'https://relay.example.com/events?topic=building-a')
+  check('分组也带在轮询与健康检查上', scoped.pollUrl.includes('topic=building-a') && scoped.healthUrl.includes('topic=building-a'))
+  check('分组地址再拼 since 时不会出现两个问号', withQuery(scoped.pollUrl, { since: '7' }) === 'https://relay.example.com/events?topic=building-a&since=7')
+  check('不带分组的地址拼参数用问号', withQuery('https://relay.example.com/events', { since: '7' }) === 'https://relay.example.com/events?since=7')
+  check('空游标不拼多余参数', withQuery('https://relay.example.com/events', { since: '' }) === 'https://relay.example.com/events')
 
   check('空值视为关闭', parseCloudChannel('').mode === 'off')
   check('非法主题被拒绝', parseCloudChannel('ntfy:带空格 的 主题').mode === 'off')

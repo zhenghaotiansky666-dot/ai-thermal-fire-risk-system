@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">热感哨兵</string>
+    <!-- 换域名只改这两处 -->
+    <string name="host">zhenghaotiansky666-dot.github.io</string>
+    <string name="launch_url">https://zhenghaotiansky666-dot.github.io/ai-thermal-fire-risk-system/user-app.html</string>
+    <string name="asset_statements">[{
+      \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+      \"target\": {
+        \"namespace\": \"web\",
+        \"site\": \"https://zhenghaotiansky666-dot.github.io\"
+      }
+    }]</string>
+</resources>

@@ -1,0 +1,13 @@
+[
+  {
+    "_readme": "TWA 校验文件：把下面的 package_name 与 sha256_cert_fingerprints 换成你们 keystore 的真实值，就不会再显示浏览器地址栏。取值方法见 android-twa/README.md。",
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.thermalguard.app",
+      "sha256_cert_fingerprints": [
+        "REPLACE_WITH_YOUR_KEYSTORE_SHA256_FINGERPRINT"
+      ]
+    }
+  }
+]

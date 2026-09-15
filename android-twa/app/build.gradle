@@ -1,0 +1,34 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.thermalguard.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.thermalguard.app"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // 没配正式签名时也能出包；正式发布请按 README 生成 keystore 并替换
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Google 官方 TWA 库：把网页装进一个没有地址栏的 Chrome 容器
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

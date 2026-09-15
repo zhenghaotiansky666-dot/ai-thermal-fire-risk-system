@@ -25,6 +25,15 @@ export const NTFY_BASE = 'https://ntfy.sh'
 
 const KINDS = new Set(['fire', 'clear', 'notice', 'status', 'report'])
 
+// 拼接查询参数：云端通道可能自带 ?topic=xxx，不能再塞一个问号
+export function withQuery(url, params = {}) {
+  const pairs = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+  if (!pairs.length) return url
+  return `${url}${url.includes('?') ? '&' : '?'}${pairs.join('&')}`
+}
+
 // ---------------------------------------------------------------- 纯函数：事件
 export function createEvent(kind, payload = {}, options = {}) {
   if (!KINDS.has(kind)) throw new Error(`unknown-event-kind:${kind}`)
@@ -176,13 +185,20 @@ export function parseCloudChannel(value) {
   const text = String(value ?? '').trim()
   if (!text) return { mode: 'off', raw: '' }
   if (text.startsWith('http://') || text.startsWith('https://')) {
+    // 支持用 #分组 区分小区/楼栋：https://relay.example.com#building-a
+    const hashIndex = text.indexOf('#')
+    const urlPart = hashIndex >= 0 ? text.slice(0, hashIndex) : text
+    const topic = hashIndex >= 0 ? text.slice(hashIndex + 1).trim() : ''
+    const base = urlPart.replace(/\/$/, '')
+    const query = topic ? `?topic=${encodeURIComponent(topic)}` : ''
     return {
       mode: 'rest',
       raw: text,
-      base: text.replace(/\/$/, ''),
-      publishUrl: `${text.replace(/\/$/, '')}/events`,
-      pollUrl: `${text.replace(/\/$/, '')}/events`,
-      healthUrl: `${text.replace(/\/$/, '')}/health`,
+      base,
+      topic,
+      publishUrl: `${base}/events${query}`,
+      pollUrl: `${base}/events${query}`,
+      healthUrl: `${base}/health${query}`,
     }
   }
   const topic = text.startsWith('ntfy:') ? text.slice(5).trim() : text
@@ -386,7 +402,7 @@ export function createEventBus(options = {}) {
       if (target.mode === 'ntfy') {
         // 第一次用 since=all 把当前会话接上，之后只按游标/时间取增量，避免公共服务的限流
         const since = state.cloudCursor || (state.cloudPrimed ? Math.floor(Date.now() / 1000) : 'all')
-        const response = await fetch(`${target.pollUrl}?poll=1&since=${encodeURIComponent(since)}`, { cache: 'no-store' })
+        const response = await fetch(withQuery(target.pollUrl, { poll: 1, since }), { cache: 'no-store' })
         if (!response.ok) {
           // 被限流时退一步：改用时间游标，再过一轮就恢复正常
           state.cloudPrimed = true
@@ -413,7 +429,7 @@ export function createEventBus(options = {}) {
         })
         return
       }
-      const response = await fetch(`${target.pollUrl}?since=${encodeURIComponent(state.cloudCursor || '')}`, { cache: 'no-store' })
+      const response = await fetch(withQuery(target.pollUrl, { since: state.cloudCursor || '' }), { cache: 'no-store' })
       if (!response.ok) return
       const data = await response.json().catch(() => null)
       if (data?.cursor) state.cloudCursor = String(data.cursor)
