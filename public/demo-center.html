@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#06101F" />
+  <meta name="description" content="热感哨兵演示中心：生成演示频道，扫码进入，跨网络接收火警" />
+  <title>演示中心｜热感哨兵</title>
+  <style>
+    :root { color-scheme: dark; --bg:#06101f; --panel:rgba(21,38,64,.9); --line:rgba(96,165,250,.22); --text:#f3f8ff; --muted:#8ea5c2; --blue:#3b82f6; --cyan:#38bdf8; --green:#22c55e; --orange:#f97316; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 82% 0,rgba(37,99,235,.25),transparent 34%),radial-gradient(circle at 12% 82%,rgba(239,68,68,.14),transparent 32%),var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { width:min(880px,calc(100% - 32px)); margin:0 auto; padding:38px 0 64px; }
+    .brand { display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+    .brand img { width:48px; height:48px; border-radius:13px; }
+    .brand strong { display:block; font-size:17px; }
+    .brand small { color:var(--muted); font-size:10px; letter-spacing:.14em; }
+    h1 { font-size:31px; margin:0 0 10px; letter-spacing:-.02em; }
+    .lead { color:var(--muted); font-size:14px; line-height:1.8; margin:0 0 20px; }
+    .card { padding:20px; border:1px solid var(--line); border-radius:20px; background:linear-gradient(145deg,var(--panel),rgba(7,16,31,.92)); box-shadow:0 24px 60px rgba(0,0,0,.25); }
+    .card + .card { margin-top:14px; }
+    .channel { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:12px; }
+    .channel code { flex:1 1 320px; padding:12px 14px; border-radius:12px; background:rgba(2,10,22,.72); border:1px solid var(--line); color:#9ad6ff; font-size:13px; word-break:break-all; }
+    button, .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:46px; padding:0 16px; border-radius:12px; border:1px solid rgba(96,165,250,.3); background:rgba(59,130,246,.14); color:#dcecff; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer; }
+    button.primary, .btn.primary { border-color:transparent; background:linear-gradient(110deg,var(--blue),var(--cyan)); color:#fff; }
+    button.warn { border-color:transparent; background:linear-gradient(110deg,#b91c1c,#f97316); color:#fff; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    @media (max-width:680px){ .grid { grid-template-columns:1fr; } h1 { font-size:26px; } }
+    .qr-card { text-align:center; }
+    .qr-card img { width:100%; max-width:240px; margin:10px auto; padding:8px; border-radius:14px; background:#fff; }
+    .qr-card strong { display:block; font-size:15px; margin-bottom:4px; }
+    .qr-card p { color:var(--muted); font-size:12px; margin:6px 0 0; }
+    ol { margin:14px 0 0; padding-left:20px; color:var(--muted); font-size:13px; line-height:1.9; }
+    .meta { color:#6f89a4; font-size:11px; line-height:1.7; }
+    .row { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+    .pill { padding:5px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); font-size:11px; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <img src="./icon-192.png" alt="热感哨兵" />
+    <div><strong>热感哨兵 · 演示中心</strong><small>DEMO CENTER</small></div>
+  </div>
+
+  <h1>一条演示频道，串起两端</h1>
+  <p class="lead">
+    先在这里生成一个演示频道，然后用两台设备分别扫码进入：一台当<strong>系统端</strong>（指挥/物业），一台当<strong>用户端</strong>（住户/评委）。
+    不管两台设备连的是同一个 Wi‑Fi、校园网还是各自的 4G/5G，扫码后都自动加入这个频道 —— 系统端一触发演练，用户端就收到火警与起火位置。
+  </p>
+
+  <section class="card">
+    <strong>① 演示频道</strong>
+    <div class="channel">
+      <code id="channel">正在生成…</code>
+      <button type="button" id="regen">换一个频道</button>
+      <button type="button" id="copy">复制</button>
+    </div>
+    <p class="meta" id="channel-note" style="margin-top:10px">
+      频道就是两端约定的暗号。默认用公共转发（ntfy.sh），零部署；正式部署后可换成你们自己的中继地址。
+    </p>
+    <div class="row">
+      <span class="pill">跨网络可用</span>
+      <span class="pill">无需账号</span>
+      <span class="pill">无需同一 Wi‑Fi</span>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card qr-card">
+      <strong>② 系统端（指挥/物业）</strong>
+      <img id="qr-system" alt="系统端二维码" />
+      <a class="btn primary" id="open-system" style="width:100%">在本机打开系统端</a>
+      <p>用于触发火警演练、查看三维校园与救援信息。</p>
+    </section>
+    <section class="card qr-card">
+      <strong>③ 用户端（住户/评委）</strong>
+      <img id="qr-user" alt="用户端二维码" />
+      <a class="btn primary" id="open-user" style="width:100%">在本机打开用户端</a>
+      <p>扫码即加入本频道，自动接收火警与疏散指引。</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <strong>演示流程（约 60 秒）</strong>
+    <ol>
+      <li>手机扫「用户端」二维码 → 打开后显示「当前无火警」，底部有表盘与「更多」。</li>
+      <li>另一台设备（或本机）点上面「打开系统端」→「预警 → 报警设置 → 开始演练」。</li>
+      <li>用户端 1 秒内进入火警态：表盘转向、距离与楼层更新，顶部出现「火警通报 · 来自系统端 …发生火情」。</li>
+      <li>用户端点「更多 → 离线联通 → 一键上报看到火」→ 系统端弹「疑似火情（用户上报）」横幅，可一键拉响警报。</li>
+      <li>系统端顶栏「链路」可看到当前通道、在线设备数与「扫码进入演示」二维码。</li>
+    </ol>
+    <p class="meta" style="margin-top:12px">
+      提示：二维码里已经带了频道参数（<code>?ch=…</code>），扫码的人不需要做任何设置。
+      装了主屏图标的用户下次打开会自动拿到最新版本，不用重新安装。
+    </p>
+  </section>
+
+  <p class="meta" style="margin-top:20px">热感哨兵 · 澳门科技大学 · 演示中心（本页也会随线上部署自动更新）</p>
+</main>
+
+<script>
+  // 不依赖构建产物：直接用公共 CDN 的二维码库；离线环境则退化为纯文字频道
+  const CDN = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js'
+  const params = new URLSearchParams(location.search)
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '')
+
+  function randomChannel() {
+    const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789'
+    let tail = ''
+    for (let i = 0; i < 14; i += 1) tail += alphabet[Math.floor(Math.random() * alphabet.length)]
+    return `ntfy:tg-demo-${tail}`
+  }
+
+  let channel = params.get('ch') || randomChannel()
+
+  function joinUrl(page) {
+    return `${base}${page}?ch=${encodeURIComponent(channel)}`
+  }
+
+  async function ensureQrLib() {
+    if (window.QRCode) return true
+    // 优先用本地随站点分发的库（离线可用），失败再退回 CDN
+    await new Promise((resolve) => {
+      const local = document.createElement('script')
+      local.src = './vendor/qrcode.min.js'
+      local.onload = resolve
+      local.onerror = resolve
+      document.head.appendChild(local)
+    })
+    if (window.QRCode) return true
+    await new Promise((resolve) => {
+      const script = document.createElement('script')
+      script.src = CDN
+      script.onload = resolve
+      script.onerror = resolve
+      document.head.appendChild(script)
+    })
+    return Boolean(window.QRCode)
+  }
+
+  async function render() {
+    document.getElementById('channel').textContent = channel
+    document.getElementById('open-system').href = joinUrl('mobile-app.html')
+    document.getElementById('open-user').href = joinUrl('user-app.html')
+    document.title = `演示中心｜${channel}`
+
+    const hasLib = await ensureQrLib()
+    const setQr = async (id, url) => {
+      const img = document.getElementById(id)
+      if (!hasLib) {
+        img.replaceWith(Object.assign(document.createElement('code'), { textContent: url, style: 'display:block;font-size:11px;word-break:break-all' }))
+        return
+      }
+      img.src = await window.QRCode.toDataURL(url, { margin: 1, width: 320, errorCorrectionLevel: 'M' })
+    }
+    await setQr('qr-system', joinUrl('mobile-app.html'))
+    await setQr('qr-user', joinUrl('user-app.html'))
+  }
+
+  document.getElementById('regen').addEventListener('click', () => {
+    channel = randomChannel()
+    history.replaceState(null, '', `?ch=${encodeURIComponent(channel)}`)
+    render()
+  })
+
+  document.getElementById('copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(channel)
+      document.getElementById('copy').textContent = '已复制'
+      setTimeout(() => { document.getElementById('copy').textContent = '复制' }, 1500)
+    } catch {
+      document.getElementById('copy').textContent = '请长按复制'
+    }
+  })
+
+  render()
+</script>
+</body>
+</html>

@@ -259,6 +259,7 @@ export function createEventBus(options = {}) {
     cloudOk: false,
     cloudChannel: cloudChannel.raw ?? '',
     cloudCursor: '',
+    cloudFailures: 0,
     lastSeq: 0,
     peers: 0,
     log: [],
@@ -369,6 +370,13 @@ export function createEventBus(options = {}) {
       state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk })
       return false
     }
+    if (target.mode === 'ntfy') {
+      // 公共转发不做额外探测：探测请求本身也会被限流。
+      // 直接乐观标记"可用"，由真正的轮询结果来判定健康度（失败会退避重试）。
+      state.cloudOk = true
+      state.level = chooseTransport({ hasLocal: typeof BroadcastChannel !== 'undefined', relayOk: state.relayOk, cloudOk: true })
+      return true
+    }
     try {
       const response = await fetch(target.healthUrl, { cache: 'no-store' })
       // 429 = 公共中继限流（端点本身是通的），照样算"可达"，随后按游标增量取数即可
@@ -400,16 +408,21 @@ export function createEventBus(options = {}) {
     if (target.mode === 'off' || !state.cloudOk) return
     try {
       if (target.mode === 'ntfy') {
-        // 第一次用 since=all 把当前会话接上，之后只按游标/时间取增量，避免公共服务的限流
-        const since = state.cloudCursor || (state.cloudPrimed ? Math.floor(Date.now() / 1000) : 'all')
+        // 第一次用"最近 15 分钟"而不是 since=all：既能接上正在进行的演练，又不会被判为重量级查询；
+        // 之后一律用消息 id 游标取增量（最省流量、最不容易被限流）。
+        const since = state.cloudCursor || '15m'
         const response = await fetch(withQuery(target.pollUrl, { poll: 1, since }), { cache: 'no-store' })
         if (!response.ok) {
-          // 被限流时退一步：改用时间游标，再过一轮就恢复正常
-          state.cloudPrimed = true
+          state.cloudFailures += 1
+          if (state.cloudFailures >= 3) state.cloudOk = false
           return
         }
         const text = await response.text()
-        state.cloudPrimed = true
+        state.cloudFailures = 0
+        if (!state.cloudOk) {
+          state.cloudOk = true
+          state.level = chooseTransport({ hasLocal: true, relayOk: state.relayOk, cloudOk: true })
+        }
         text.split('\n').filter(Boolean).forEach((line) => {
           let record = null
           try {
@@ -481,7 +494,9 @@ export function createEventBus(options = {}) {
         const loop = async () => {
           if (stopped) return
           await pollCloud()
-          if (!stopped) cloudTimer = window.setTimeout(loop, cloudPollMs)
+          // 失败越多退避越久：公共转发被限流时不再猛打，等一会儿自己恢复
+          const delay = state.cloudFailures === 0 ? cloudPollMs : state.cloudFailures === 1 ? 15000 : 40000
+          if (!stopped) cloudTimer = window.setTimeout(loop, delay)
         }
         loop()
       })

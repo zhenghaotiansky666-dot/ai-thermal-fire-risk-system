@@ -4,6 +4,7 @@ import UserApp from './UserApp.jsx'
 import { bootstrapAiConfig } from '../shared/aiClient.js'
 import { extractChannelFromSearch } from '../shared/geoChannels.js'
 import { readCloudChannel, saveCloudChannel } from '../shared/eventBus.js'
+import { startUpdateWatch } from '../shared/updateCheck.js'
 import './user.css'
 
 // 扫码进入演示：二维码里带 ?ch=频道，先落地频道再做其他初始化
@@ -22,6 +23,9 @@ bootstrapAiConfig().finally(() => {
     </React.StrictMode>
   )
 })
+
+// 线上更新：装了主屏图标的用户下次打开会自动拿到新版本，这里额外给一个可见提示
+startUpdateWatch()
 
 // 逃生指引是断网时最需要打开的那个页面，所以自己也注册 Service Worker
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
