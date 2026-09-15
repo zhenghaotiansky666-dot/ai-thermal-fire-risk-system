@@ -18,12 +18,14 @@ import {
   saveRelayBase,
   sharedEventBus,
 } from '../shared/eventBus.js'
+import { isAutoJoinEnabled, setAutoJoinEnabled } from '../shared/geoChannels.js'
 
 export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, onReport }) {
   const bus = useMemo(() => sharedEventBus(), [])
   const [status, setStatus] = useState(() => bus.status())
   const [relayBase, setRelayBase] = useState(() => readRelayBase())
   const [cloudChannel, setCloudChannel] = useState(() => readCloudChannel())
+  const [autoJoin, setAutoJoin] = useState(() => isAutoJoinEnabled())
   const [codeInput, setCodeInput] = useState('')
   const [message, setMessage] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -162,6 +164,17 @@ export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, o
         <button type="button" onClick={() => setCloudChannel(makeCloudChannel())}>生成一个</button>
         <button type="button" className="more-primary" onClick={applyCloud}>保存云端通道</button>
       </div>
+      <label className="ai-check">
+        <input
+          type="checkbox"
+          checked={autoJoin}
+          onChange={(event) => {
+            setAutoJoin(event.target.checked)
+            setAutoJoinEnabled(event.target.checked)
+          }}
+        />
+        走到校园/小区范围内时自动加入该区域的警报频道（用定位判断，只在本机计算）
+      </label>
       <p className="more-hint">
         系统端「链路」面板里点“生成一个新通道”，把那个值填到这里（或扫它的二维码）即可配对；
         留空表示不用云端，退回局域网/离线码。

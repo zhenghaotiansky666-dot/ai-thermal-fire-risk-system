@@ -23,6 +23,12 @@ import {
 } from './binaryDialogue.js'
 import { createEvent, fireFromEvent, sharedEventBus } from '../shared/eventBus.js'
 import OfflineLink from './OfflineLink.jsx'
+import {
+  isAutoJoinEnabled,
+  readAreaChannels,
+  resolveAreaChannel,
+} from '../shared/geoChannels.js'
+import { readCloudChannel, saveCloudChannel } from '../shared/eventBus.js'
 // 所有传感器输入（信标定位、火情、热像、朝向、设置）统一从这一层订阅
 import {
   KEYS,
@@ -116,6 +122,8 @@ export default function UserApp() {
   // 收到的火警通报（来自系统端：局域网中继自动送达，或扫离线码人工导入）
   const [linkNotice, setLinkNotice] = useState('')
   const [linkReported, setLinkReported] = useState('')
+  // 位置自动加入：GPS 落在某个区域范围内时，自动订阅该区域的警报频道
+  const [areaJoin, setAreaJoin] = useState(null)
   // 声音/播报/震动设置由系统端维护，用户端跟随，避免两边不一致
   const [settings, setSettings] = useState(() => readSettings())
   const [audioReady, setAudioReady] = useState(() => isAudioUnlocked())
@@ -189,6 +197,29 @@ export default function UserApp() {
     window.setTimeout(() => setLinkReported(''), 3000)
     return finalEvent
   }
+
+  // 位置自动加入：拿到 GPS 后判断是否在某个区域范围内；在范围内且用户没有手动设过频道，
+  // 就自动订阅该区域的警报频道 —— 用户只需要"扫码 + 允许定位"，不用填任何东西。
+  useEffect(() => {
+    if (!isAutoJoinEnabled()) return
+    if (gps.status !== 'active' || !gps.location) return
+    const match = resolveAreaChannel(gps.location.lat, gps.location.lon, readAreaChannels())
+    if (!match?.area?.channel) {
+      setAreaJoin(null)
+      return
+    }
+    setAreaJoin({
+      area: match.area,
+      distanceMeters: match.distanceMeters,
+      channel: match.area.channel,
+    })
+    const current = readCloudChannel()
+    if (current === match.area.channel) return
+    if (current) return // 用户手动配置过频道就尊重用户选择
+    saveCloudChannel(match.area.channel)
+    sharedEventBus().stop()
+    window.location.reload()
+  }, [gps.status, gps.location])
 
   // 手机朝向：订阅罗盘/IMU，方向指示随真实朝向实时更新
   useEffect(() => {
@@ -622,6 +653,15 @@ export default function UserApp() {
             <div className="link-note is-report">
               <span className="link-tag">已上报系统端</span>
               <span>{linkReported}</span>
+            </div>
+          )}
+
+          {areaJoin && (
+            <div className="link-note is-area">
+              <span className="link-tag">已自动加入区域警报</span>
+              <span>
+                {areaJoin.area.label}（距中心约 {areaJoin.distanceMeters} 米）· 该区域的火警会直接推到这个手机
+              </span>
             </div>
           )}
 

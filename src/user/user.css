@@ -637,6 +637,7 @@ p { margin: 0; }
   line-height: 1.55;
 }
 .link-note.is-report { border-color: rgba(48, 209, 88, .45); background: rgba(48, 209, 88, .14); }
+.link-note.is-area { border-color: rgba(56, 189, 248, .45); background: rgba(14, 165, 233, .14); }
 .link-tag { color: var(--text-2); font-size: 11px; letter-spacing: .3px; }
 
 /* ==== 离线联通面板 ==== */

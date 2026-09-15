@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/thermal.test.mjs && node tests/evacuation.test.mjs && node tests/sensors.test.mjs && node tests/sensorFusion.test.mjs && node tests/detection.test.mjs && node tests/crowd.test.mjs && node tests/geo.test.mjs && node tests/floorplan.test.mjs && node tests/aiPhases.test.mjs && node tests/dialogue.test.mjs && node tests/aiHooks.test.mjs && node tests/eventBus.test.mjs",
+    "test": "node tests/thermal.test.mjs && node tests/evacuation.test.mjs && node tests/sensors.test.mjs && node tests/sensorFusion.test.mjs && node tests/detection.test.mjs && node tests/crowd.test.mjs && node tests/geo.test.mjs && node tests/geoChannels.test.mjs && node tests/floorplan.test.mjs && node tests/aiPhases.test.mjs && node tests/dialogue.test.mjs && node tests/aiHooks.test.mjs && node tests/eventBus.test.mjs",
     "eval:detection": "node tools/detection-eval.mjs"
   },
   "dependencies": {

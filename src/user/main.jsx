@@ -2,7 +2,16 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import UserApp from './UserApp.jsx'
 import { bootstrapAiConfig } from '../shared/aiClient.js'
+import { extractChannelFromSearch } from '../shared/geoChannels.js'
+import { readCloudChannel, saveCloudChannel } from '../shared/eventBus.js'
 import './user.css'
+
+// 扫码进入演示：二维码里带 ?ch=频道，先落地频道再做其他初始化
+// （演示场景下这一步是"明确的加入动作"，所以直接覆盖本机已保存的频道）
+const joinChannel = extractChannelFromSearch(typeof window === 'undefined' ? '' : window.location.search)
+if (joinChannel && joinChannel !== readCloudChannel()) {
+  saveCloudChannel(joinChannel)
+}
 
 // 先把 AI 接入配置读进来（window.THERMAL_GUARD_AI / ai-config.json），再渲染界面，
 // 这样队友改配置文件就能直接生效，不需要在界面上点。

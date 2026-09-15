@@ -20,6 +20,7 @@ import {
   saveRelayBase,
   sharedEventBus,
 } from '../shared/eventBus.js'
+import { buildJoinUrl } from '../shared/geoChannels.js'
 
 export default function LinkSheet({ onClose, latestFire, noticeText }) {
   const bus = useMemo(() => sharedEventBus(), [])
@@ -29,6 +30,7 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
   // 打开面板时先灌入总线里已有的事件，再接收后续新增
   const [events, setEvents] = useState(() => bus.recent())
   const [qr, setQr] = useState('')
+  const [joinQr, setJoinQr] = useState('')
   const qrRef = useRef(null)
   // 从报警浮层点进来时，同一次点击可能"穿透"到刚挂载的遮罩上，导致面板被立刻关掉
   const mountedAt = useRef(Date.now())
@@ -79,6 +81,29 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
       cancelled = true
     }
   }, [code])
+
+  // 「扫码进入演示」二维码：扫码后用户端自动加入当前频道，不受网络环境影响
+  const joinUrl = useMemo(() => {
+    if (!cloudChannel || typeof window === 'undefined') return ''
+    const base = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}user-app.html`
+    return buildJoinUrl(base, cloudChannel)
+  }, [cloudChannel])
+
+  useEffect(() => {
+    if (!joinUrl) {
+      setJoinQr('')
+      return undefined
+    }
+    let cancelled = false
+    import('qrcode').then(({ default: QRCode }) => QRCode.toDataURL(joinUrl, { margin: 1, width: 360, errorCorrectionLevel: 'M' }))
+      .then((url) => {
+        if (!cancelled) setJoinQr(url)
+      })
+      .catch(() => setJoinQr(''))
+    return () => {
+      cancelled = true
+    }
+  }, [joinUrl])
 
   const applyRelay = async () => {
     saveRelayBase(relayBase)
@@ -148,6 +173,21 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
             <textarea className="link-pair" rows={2} readOnly value={pairCode} onFocus={(event) => event.target.select()} />
           )}
         </div>
+
+        {joinQr && (
+          <div className="link-join">
+            <div className="link-qr-head">
+              <strong><QrCode size={14} />扫码进入演示（跨网络可用）</strong>
+              <span>评委/住户扫码 → 用户端自动加入当前频道，不需要任何设置</span>
+            </div>
+            <img src={joinQr} alt="扫码加入演示二维码" />
+            <textarea className="link-pair" rows={2} readOnly value={joinUrl} onFocus={(event) => event.target.select()} />
+            <p className="situation-note">
+              这个二维码里带了频道暗号：不管对方连的是校园网、家里 Wi-Fi 还是 4G/5G，
+              扫进来就受本演示的系统端控制（系统端一触发演练，用户端就收到火警与位置）。
+            </p>
+          </div>
+        )}
 
         <div className="link-relay">
           <label>
