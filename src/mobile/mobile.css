@@ -146,8 +146,10 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .mobile-brand > div { display: flex; flex-direction: column; gap: 1px; }
 .mobile-brand strong { font-size: var(--t-subhead); font-weight: 600; letter-spacing: -.01em; }
 .mobile-brand small { color: var(--text-3); font-size: var(--t-caption-2); }
-.top-actions { display: flex; align-items: center; gap: 8px; }
-.top-actions > button {
+.top-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 只给"纯图标"按钮定尺寸；带文字的胶囊按钮（AI 指挥 / 链路）必须按内容自适应，
+   否则文字会溢出 32×32 的方框（就是之前看起来"不在框里"的原因） */
+.top-actions > button:not(.ai-entry) {
   width: 32px;
   height: 32px;
   display: grid;
@@ -160,7 +162,8 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  height: 30px;
+  padding: 0 10px;
   color: var(--text-2);
   border-radius: var(--r-pill);
   background: var(--fill-quiet);
@@ -1846,45 +1849,70 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 
 
 /* 系统端 → 用户端的小入口：常驻顶栏，一键切到逃生视角 */
-.peer-link {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(56, 189, 248, .35);
-  background: rgba(56, 189, 248, .12);
-  color: #7dd3fc;
-  font-size: 12px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
+/* 顶栏三个胶囊（用户端 / AI 指挥 / 链路）统一尺寸与对齐，保证都"在框里" */
+.peer-link,
 .ai-entry {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 6px 11px;
+  height: 30px;
+  padding: 0 11px;
   border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.peer-link {
+  border: 1px solid rgba(56, 189, 248, .35);
+  background: rgba(56, 189, 248, .12);
+  color: #7dd3fc;
+}
+.ai-entry {
   border: 1px solid rgba(148, 163, 184, .35);
   background: rgba(148, 163, 184, .12);
   color: #cbd5e1;
-  font-size: 12px;
-  white-space: nowrap;
 }
-.ai-entry:hover { border-color: rgba(56, 189, 248, .45); color: #7dd3fc; }
-.link-entry { position: relative; }
-.link-entry em {
-  position: absolute;
-  top: -5px;
-  right: -4px;
-  min-width: 15px;
-  padding: 1px 4px;
+.ai-entry:hover,
+.peer-link:hover { border-color: rgba(56, 189, 248, .5); color: #7dd3fc; }
+.peer-link svg,
+.ai-entry svg { flex: 0 0 auto; }
+/* 角标放进胶囊内部：原来绝对定位挂在框外，看起来像"跑出方框" */
+.ai-entry .link-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 1px;
+  padding: 0 4px;
   border-radius: 999px;
   background: #ef4444;
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
   font-style: normal;
-  text-align: center;
+  line-height: 1;
+}
+
+/* 窄屏：先收掉状态文字，再收掉胶囊里的文字，只留图标，避免顶栏挤爆 */
+@media (max-width: 430px) {
+  .mobile-topbar { gap: 6px; padding-left: 12px; padding-right: 12px; }
+  /* 品牌文字让位给操作区：只保留火焰图标，顶栏在 390px 宽度下也不会横向溢出 */
+  .mobile-brand > div { display: none; }
+  .connection-badge .conn-text { display: none; }
+  .connection-badge { padding: 0 8px; }
+  .top-actions { gap: 6px; }
+  .peer-link,
+  .ai-entry { padding: 0 9px; }
+}
+@media (max-width: 380px) {
+  .peer-link span,
+  .ai-entry span { display: none; }
+  .peer-link,
+  .ai-entry { padding: 0 8px; }
+  .ai-entry .link-count { display: none; }
 }
 
 /* ==== 两端联通（链路）面板 ==== */

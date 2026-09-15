@@ -8,6 +8,7 @@ import {
   Box,
   BellRing,
   Cable,
+  Smartphone,
   Camera,
   CheckCircle2,
   ChevronRight,
@@ -203,7 +204,7 @@ function riskColor(risk) {
 
 function ConnectionBadge({ state }) {
   const text = state === 'connected' ? '设备在线' : state === 'connecting' ? '连接中' : state === 'failed' ? '连接失败' : '模拟运行'
-  return <span className={`connection-badge state-${state}`}><i />{text}</span>
+  return <span className={`connection-badge state-${state}`} title={text}><i /><span className="conn-text">{text}</span></span>
 }
 
 function RiskBadge({ risk, compact = false }) {
@@ -1621,9 +1622,11 @@ export default function MobileApp() {
           </button>
           <button type="button" className="ai-entry link-entry" title="两端联通 · 局域网中继与离线码" onClick={() => setShowLinkSheet(true)}>
             <Link2 size={15} /><span>链路</span>
-            {peerEvents.length > 0 && <em>{peerEvents.length}</em>}
+            {peerEvents.length > 0 && <em className="link-count">{peerEvents.length}</em>}
           </button>
-          <a className="peer-link" href="./user-app.html" title="切换到用户端">用户端</a>
+          <a className="peer-link" href="./user-app.html" title="切换到用户端">
+            <Smartphone size={14} /><span>用户端</span>
+          </a>
           <button type="button" aria-label="设备管理" onClick={() => setShowDevices(true)}><Cable size={18} /></button>
         </div>
       </header>
