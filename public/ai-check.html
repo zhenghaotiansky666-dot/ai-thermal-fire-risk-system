@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#06101F" />
+  <title>AI 接入自检｜热感哨兵</title>
+  <style>
+    :root { color-scheme: dark; --bg:#06101f; --panel:rgba(21,38,64,.9); --line:rgba(96,165,250,.22); --text:#f3f8ff; --muted:#8ea5c2; --blue:#3b82f6; --cyan:#38bdf8; --green:#22c55e; --red:#ef4444; --amber:#f59e0b; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 80% 0,rgba(37,99,235,.22),transparent 34%),var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { width:min(760px,calc(100% - 32px)); margin:0 auto; padding:34px 0 60px; }
+    h1 { font-size:26px; margin:0 0 8px; letter-spacing:-.02em; }
+    .lead { color:var(--muted); font-size:13px; line-height:1.8; margin:0 0 18px; }
+    .card { padding:18px; border:1px solid var(--line); border-radius:18px; background:linear-gradient(145deg,var(--panel),rgba(7,16,31,.92)); }
+    .card + .card { margin-top:14px; }
+    label { display:flex; flex-direction:column; gap:6px; color:var(--muted); font-size:12px; margin-bottom:10px; }
+    input { min-height:44px; padding:0 12px; border-radius:11px; border:1px solid var(--line); background:rgba(2,10,22,.7); color:var(--text); font-size:14px; }
+    .row { display:flex; flex-wrap:wrap; gap:10px; }
+    button { min-height:46px; padding:0 16px; border-radius:12px; border:1px solid rgba(96,165,250,.3); background:rgba(59,130,246,.14); color:#dcecff; font-size:14px; font-weight:600; cursor:pointer; }
+    button.primary { border-color:transparent; background:linear-gradient(110deg,var(--blue),var(--cyan)); color:#fff; }
+    button:disabled { opacity:.55; }
+    ol.results { list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:9px; }
+    ol.results li { display:flex; flex-direction:column; gap:4px; padding:11px 12px; border-radius:12px; border:1px solid var(--line); background:rgba(4,13,27,.6); font-size:13px; line-height:1.6; }
+    ol.results li.pass { border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.1); }
+    ol.results li.warn { border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.1); }
+    ol.results li.fail { border-color:rgba(239,68,68,.45); background:rgba(239,68,68,.12); }
+    ol.results em { color:#fbbf24; font-style:normal; font-size:12px; }
+    .stage { position:relative; overflow:hidden; aspect-ratio:4/3; margin-top:10px; border-radius:14px; border:1px solid var(--line); background:#000; }
+    .stage video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .meta { color:#6f89a4; font-size:11px; line-height:1.7; }
+    code { color:#9ad6ff; word-break:break-all; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>AI 接入自检（在你这台电脑上跑）</h1>
+  <p class="lead">
+    这个页面的测试请求是<strong>从你这台电脑的浏览器直接发给模型端点</strong>的，
+    所以它验证的正是"你这台机器能不能连上模型"。跑模型那台电脑的自检见
+    <code>node tools/ai-doctor.mjs</code>。
+  </p>
+
+  <section class="card">
+    <label>模型端点地址
+      <input id="endpoint" placeholder="http://192.168.1.20:11434/v1 或 /ai/v1" />
+    </label>
+    <label>模型名（可留空，测试时会自动用列表里的第一个）
+      <input id="model" placeholder="qwen2.5:7b" />
+    </label>
+    <label>访问密钥（本地模型留空）
+      <input id="apiKey" type="password" placeholder="可选" />
+    </label>
+    <div class="row">
+      <button class="primary" id="run">开始测试</button>
+      <button id="scan">扫码填入（配对二维码）</button>
+      <button id="copy">复制结果发给负责人</button>
+    </div>
+    <div class="stage" id="stage" style="display:none">
+      <video id="video" autoplay playsinline muted></video>
+    </div>
+  </section>
+
+  <section class="card">
+    <strong>测试结果</strong>
+    <ol class="results" id="results"><li>还没测试。填好端点后点「开始测试」。</li></ol>
+  </section>
+
+  <p class="meta">
+    常见结论对照：<br />
+    · 报 <code>Failed to fetch</code> 且端点是 http://… → 多半是 CORS 没放开：在跑模型的电脑上用
+    <code>OLLAMA_ORIGINS=*</code> 重启（Windows：<code>set OLLAMA_ORIGINS=*</code>）；<br />
+    · 页面是 https 但端点是 http://… → 浏览器混合内容拦截，改用本地站点（http）打开本页，或端点填 <code>/ai/v1</code>；<br />
+    · 404 → 模型名或路径前缀不对（Ollama 的 OpenAI 兼容路径是 <code>/v1</code>）；<br />
+    · 一直转圈 → 两台电脑不在同一网络，或防火墙没放行 11434。
+  </p>
+</main>
+
+<script>
+  const results = document.getElementById('results')
+  const endpointInput = document.getElementById('endpoint')
+  const modelInput = document.getElementById('model')
+  const apiKeyInput = document.getElementById('apiKey')
+  let lastSummary = ''
+
+  // 从配对二维码链接里取端点（?ai=<base64url>）
+  function decodePairing(code) {
+    try {
+      const padded = String(code).replace(/-/g, '+').replace(/_/g, '/')
+      const withPad = padded + '='.repeat((4 - (padded.length % 4)) % 4)
+      const json = decodeURIComponent(escape(atob(withPad)))
+      return JSON.parse(json)
+    } catch {
+      return null
+    }
+  }
+  const params = new URLSearchParams(location.search)
+  const paired = params.get('ai') ? decodePairing(params.get('ai')) : null
+  if (paired) {
+    endpointInput.value = paired.baseUrl || ''
+    modelInput.value = paired.model || ''
+  } else {
+    endpointInput.value = location.origin.startsWith('http') && !location.origin.includes('github.io') ? '/ai/v1' : ''
+  }
+
+  function render(items) {
+    results.innerHTML = ''
+    items.forEach((item) => {
+      const li = document.createElement('li')
+      li.className = item.level || ''
+      const head = document.createElement('span')
+      head.textContent = `${item.level === 'pass' ? '✅' : item.level === 'warn' ? '⚠️' : '❌'} ${item.title}`
+      li.appendChild(head)
+      if (item.detail) {
+        const detail = document.createElement('span')
+        detail.className = 'meta'
+        detail.textContent = item.detail
+        li.appendChild(detail)
+      }
+      if (item.remedy) {
+        const remedy = document.createElement('em')
+        remedy.textContent = `怎么修：${item.remedy}`
+        li.appendChild(remedy)
+      }
+      results.appendChild(li)
+    })
+    lastSummary = items.map((item) => `${item.level === 'pass' ? 'OK' : item.level === 'warn' ? 'WARN' : 'FAIL'} ${item.title}${item.remedy ? ` | ${item.remedy}` : ''}`).join('\n')
+  }
+
+  async function timedFetch(url, options = {}, timeoutMs = 12000) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal })
+      const text = await response.text()
+      let json = null
+      try { json = JSON.parse(text) } catch {}
+      return { ok: response.ok, status: response.status, headers: response.headers, json, text, cors: response.headers.get('access-control-allow-origin') }
+    } catch (error) {
+      return { ok: false, status: 0, error: String(error?.message || error), cors: null }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  async function run() {
+    const endpoint = endpointInput.value.trim().replace(/\/$/, '')
+    const wanted = modelInput.value.trim()
+    const items = []
+    if (!endpoint) {
+      render([{ level: 'fail', title: '没填端点地址', remedy: '填 http://<跑模型那台电脑的IP>:11434/v1，或扫码填入' }])
+      return
+    }
+
+    const pageSecure = location.protocol === 'https:'
+    const endpointHttp = endpoint.startsWith('http://')
+    const isRelative = endpoint.startsWith('/')
+    if (pageSecure && endpointHttp) {
+      items.push({ level: 'fail', title: '混合内容会被浏览器拦掉', detail: `本页是 ${location.protocol}，端点是 ${endpoint}`, remedy: '用本地站点（http://<IP>:4173/ai-check.html）打开本页，或把端点改成同源代理 /ai/v1' })
+    }
+
+    const models = await timedFetch(`${endpoint}/models`)
+    if (models.ok) {
+      const list = (models.json?.data ?? models.json?.models ?? []).map((item) => item?.id ?? item?.name).filter(Boolean)
+      items.push({
+        level: 'pass',
+        title: `端点可达，读到 ${list.length} 个模型`,
+        detail: list.slice(0, 5).join('、') || '（接口没返回模型名）',
+        remedy: '',
+      })
+      // 浏览器能读到响应内容，本身就说明 CORS 没问题（CORS 响应头 JS 是读不到的，只能这样判断）
+      try {
+        const endpointHost = new URL(endpoint, location.href)
+        if (endpointHost.origin !== location.origin) {
+          items.push({ level: 'pass', title: '跨源访问成功：CORS 已放开', detail: `本页 ${location.origin} → ${endpointHost.origin}`, remedy: '' })
+        }
+      } catch {}
+      const picked = wanted && list.includes(wanted) ? wanted : (list[0] || wanted)
+      if (wanted && list.length && !list.includes(wanted)) {
+        items.push({ level: 'warn', title: `列表里没有 ${wanted}`, remedy: `把模型名改成已有的 ${list[0]}` })
+      }
+      const chat = await timedFetch(`${endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(apiKeyInput.value ? { Authorization: `Bearer ${apiKeyInput.value}` } : {}) },
+        body: JSON.stringify({ model: picked || 'local-model', messages: [{ role: 'user', content: '只回复两个字：可用' }], max_tokens: 16, stream: false }),
+      }, 20000)
+      if (chat.ok && chat.json?.choices?.[0]?.message?.content) {
+        items.push({ level: 'pass', title: '模型可用（真的返回了内容）', detail: String(chat.json.choices[0].message.content).slice(0, 40), remedy: '' })
+      } else if (chat.status === 404) {
+        items.push({ level: 'fail', title: '模型不存在（404）', remedy: '按上面列出的模型名填写，或先在跑模型的电脑上 ollama pull' })
+      } else {
+        items.push({ level: 'fail', title: `对话失败${chat.status ? `（HTTP ${chat.status}）` : ''}`, detail: chat.error || '', remedy: '看跑模型那台电脑的控制台报错；显存不足就换小模型' })
+      }
+    } else if (models.status === 404) {
+      items.push({ level: 'fail', title: '端点路径不对（404）', detail: endpoint, remedy: 'Ollama 的 OpenAI 兼容路径以 /v1 结尾，例如 http://192.168.1.20:11434/v1' })
+    } else if (models.error) {
+      items.push({
+        level: 'fail',
+        title: `连不上端点（${models.error}）`,
+        detail: endpoint,
+        remedy: isRelative
+          ? '相对路径 /ai/v1 需要配合本地服务器（node tools/setup-local-ai.mjs）使用'
+          : '1) 跑模型的电脑是否用 OLLAMA_HOST=0.0.0.0:11434 启动；2) 两台机器是否同一网络；3) 防火墙是否放行；4) CORS：用 OLLAMA_ORIGINS=* 重启',
+      })
+    } else {
+      items.push({ level: 'fail', title: `端点返回 HTTP ${models.status}`, remedy: '检查是否填了多余的路径、或该端点需要访问密钥' })
+    }
+
+    render(items)
+  }
+
+  document.getElementById('run').addEventListener('click', run)
+
+  document.getElementById('scan').addEventListener('click', async () => {
+    const stage = document.getElementById('stage')
+    const video = document.getElementById('video')
+    stage.style.display = 'block'
+    try {
+      await new Promise((done) => {
+        const script = document.createElement('script')
+        script.src = './vendor/jsqr.min.js'
+        script.onload = done
+        script.onerror = done
+        document.head.appendChild(script)
+      })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      video.srcObject = stream
+      await video.play().catch(() => {})
+      const canvas = document.createElement('canvas')
+      const tick = () => {
+        if (video.readyState >= 2 && video.videoWidth && typeof jsQR === 'function') {
+          const scale = Math.min(1, 640 / video.videoWidth)
+          canvas.width = Math.round(video.videoWidth * scale)
+          canvas.height = Math.round(video.videoHeight * scale)
+          const ctx = canvas.getContext('2d', { willReadFrequently: true })
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const found = jsQR(image.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })
+          if (found?.data) {
+            const url = new URL(found.data, location.href)
+            const code = url.searchParams.get('ai')
+            const payload = code ? decodePairing(code) : null
+            if (payload) {
+              endpointInput.value = payload.baseUrl || ''
+              modelInput.value = payload.model || ''
+              render([{ level: 'pass', title: '已从二维码读入端点与模型', detail: `${payload.baseUrl} · ${payload.model || '（未写模型名）'}`, remedy: '' }])
+            } else {
+              render([{ level: 'warn', title: '这个二维码里没有 AI 配置', detail: found.data.slice(0, 60), remedy: '请扫系统端「AI 指挥 → 生成配对二维码」那个码' }])
+            }
+            stream.getTracks().forEach((track) => track.stop())
+            stage.style.display = 'none'
+            return
+          }
+        }
+        requestAnimationFrame(tick)
+      }
+      tick()
+    } catch (error) {
+      stage.style.display = 'none'
+      render([{ level: 'warn', title: '打不开摄像头', detail: String(error?.message || error), remedy: '可以手动把端点地址填进去，效果一样' }])
+    }
+  })
+
+  document.getElementById('copy').addEventListener('click', async () => {
+    const text = `【热感哨兵 AI 自检】\n端点：${endpointInput.value || '未填'}\n模型：${modelInput.value || '未填'}\n页面：${location.href}\n\n${lastSummary || '（还没测试）'}`
+    try {
+      await navigator.clipboard.writeText(text)
+      document.getElementById('copy').textContent = '已复制'
+      setTimeout(() => { document.getElementById('copy').textContent = '复制结果发给负责人' }, 1500)
+    } catch {
+      document.getElementById('copy').textContent = '请长按选择复制'
+    }
+  })
+
+  if (paired) run()
+</script>
+</body>
+</html>

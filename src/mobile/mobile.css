@@ -2050,6 +2050,12 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .ai-diagnose li.level-fail span { color: #ffb4a8; }
 .ai-diagnose p { margin: 8px 0 0; color: #8fb2d2; font-size: 8px; line-height: 1.55; }
 .ai-sheet-actions .ai-apply { color: #04212f; border-color: transparent; background: linear-gradient(110deg, #38bdf8, #7dd3fc); font-weight: 700; }
+.ai-external-check {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 36px; padding: 0 12px;
+  color: #9ad6ff; border: 1px dashed rgba(56,189,248,.45); border-radius: 10px;
+  background: rgba(14,165,233,.08); font-size: 9px; text-decoration: none;
+}
 .ai-pair { padding: 11px 12px; border: 1px solid rgba(56,189,248,.32); border-radius: 12px; background: rgba(14,165,233,.1); display: flex; flex-direction: column; gap: 8px; }
 .ai-pair > strong { color: #dcecff; font-size: 10px; }
 .ai-pair img { display: block; width: 180px; height: 180px; margin: 0 auto; padding: 6px; border-radius: 12px; background: #fff; }

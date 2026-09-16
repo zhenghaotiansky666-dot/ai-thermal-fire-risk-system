@@ -186,6 +186,14 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           <button type="button" onClick={buildPairing}>
             <Server size={15} /> 生成配对二维码
           </button>
+          <a
+            className="ai-external-check"
+            href={`./ai-check.html${form.baseUrl || pairUrl ? `?ai=${encodeURIComponent(buildAiPairUrl('', { baseUrl: form.baseUrl || '/ai/v1', model: form.model, vision: Boolean(form.vision) })).replace(/^\?ai=/, '')}` : ''}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Stethoscope size={15} /> 在浏览器里自检（给队友那台机器用）
+          </a>
           <span className={`ai-probe ${probe === 'ok' ? 'is-ok' : probe === 'fail' ? 'is-fail' : ''}`}>
             {probe === 'ok' ? '端点可用，将由本地模型接管' : probe === 'fail' ? '端点不可用（仍可使用规则引擎）' : '未测试'}
           </span>
