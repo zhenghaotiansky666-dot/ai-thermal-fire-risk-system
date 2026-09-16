@@ -343,6 +343,7 @@ export function localDecision(context = {}) {
     phase = 'response',
     prevention = null,
     vital = null,
+    perception = null,
   } = context
 
   // 阶段一：预防判定——该不该报警 + 给周边居民的通知
@@ -403,6 +404,7 @@ export function localDecision(context = {}) {
       summary: '未检测到火警，系统处于值守状态',
       action: '保持通道畅通，确认最近出口位置',
       instruction: '可在「我的位置」中开启 GPS，或上传本层逃生路线图备用',
+      perception: perception?.source ?? null,
     }
   }
 
@@ -417,6 +419,10 @@ export function localDecision(context = {}) {
   const summary = [
     `${fireFloor} 楼起火`,
     sources > 1 ? `${sources} 处火源` : null,
+    // 感知层证据（例如 YOLO 的火焰/烟雾置信度）也并入决策文案：
+    // 这样"只装了视觉模型、没装大模型"时，规则决策同样能把现场说清楚
+    Number.isFinite(Number(perception?.flame)) && perception.flame !== null ? `视觉火焰 ${Math.round(perception.flame * 100)}%` : null,
+    Number.isFinite(Number(perception?.smoke)) && perception.smoke !== null ? `烟雾 ${Math.round(perception.smoke * 100)}%` : null,
     congested.length ? `${congested.join('/')} 梯拥堵` : null,
     queue > 12 ? `排队 ${queue} 人` : null,
   ].filter(Boolean).join(' · ')
@@ -450,6 +456,7 @@ export function localDecision(context = {}) {
     summary,
     action,
     instruction,
+    perception: perception?.source ?? null,
   }
 }
 

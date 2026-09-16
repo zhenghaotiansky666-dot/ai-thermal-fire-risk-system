@@ -1132,6 +1132,8 @@ export default function MobileApp() {
         position,
         blocked: blockedNodes,
         userStatus: readUserStatuses(),
+        // 感知层来源：装了 YOLO 就标出来，方便界面区分"感知"和"决策"
+        perception: { source: readAiSettings().visionUrl ? 'yolo' : 'thermal-only' },
       }, readAiSettings())
       if (!cancelled) setRescueBrief(outcome)
     }, 900)

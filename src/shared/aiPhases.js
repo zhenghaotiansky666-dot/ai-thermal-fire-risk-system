@@ -99,10 +99,18 @@ export function fusePreventionSignals(input = {}, options = {}) {
   // 单一证据不报警：两路证据齐全，或热像自身满足强条件且带趋势
   const enoughEvidence = evidenceCount >= 2
   const thermalAlone = thermalStrong && fastRise && lasting
-  const alarm = (tempHit || flameSeen) && (enoughEvidence || thermalAlone) && score >= weights.alarmThreshold
+  // 视觉看到明火是一种"直接证据"：高置信火焰、或火焰+烟雾同时确认，就应该报警，
+  // 不能因为热像还没升温（火源离节点远、面积小）就漏报。
+  const visualConfirmedFlame = flame >= 0.75
+  const twoVisualCues = flame >= 0.6 && Math.max(smokeConfidence, smokeDensity) >= 0.5
+  const alarm = visualConfirmedFlame
+    || twoVisualCues
+    || ((tempHit || flameSeen) && (enoughEvidence || thermalAlone) && score >= weights.alarmThreshold)
   const watch = !alarm && (score >= weights.watchThreshold || tempWarm || smokeSeen || flameSeen)
 
   const level = alarm ? 'alarm' : watch ? 'watch' : 'normal'
+  if (visualConfirmedFlame) reasons.push(`视觉高置信确认明火（${(flame * 100).toFixed(0)}%）`)
+  else if (twoVisualCues) reasons.push('视觉同时确认火焰与烟雾（两路独立证据）')
   const missing = []
   if (!flameSeen) missing.push('视觉未确认火焰')
   if (!smokeSeen) missing.push('未识别到烟雾')

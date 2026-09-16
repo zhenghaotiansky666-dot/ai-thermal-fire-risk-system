@@ -82,11 +82,18 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
 
   const runAiReview = async () => {
     setBusy(true)
+    const settings = readAiSettings()
     const outcome = await aiCommand({
       phase: 'prevention',
       prevention: { decision, notice, location: '教学楼' },
       position: { floor },
-    }, readAiSettings())
+      // 只装了 YOLO 也要把感知结果告诉决策层（规则引擎或本地模型都会用上）
+      perception: {
+        flame: visionFlame,
+        smoke: visionSmoke,
+        source: settings.visionUrl ? 'yolo' : visionChannel.attached ? 'channel' : 'demo',
+      },
+    }, settings)
     setAiReview(outcome)
     setBusy(false)
   }

@@ -214,6 +214,24 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           </p>
         </div>
 
+        <div className="ai-sheet-status">
+          <strong>感知 / 决策 分工（只有 YOLO 也能跑完整流程）</strong>
+          <ul>
+            <li>
+              感知（看见了什么）：{form.visionUrl
+                ? `视觉通道 YOLO（${form.visionModel || '默认权重'}）`
+                : '未配 YOLO —— 阶段一的火焰/烟雾用演示滑杆'}
+              {' + '}热像节点（温度矩阵）
+            </li>
+            <li>
+              决策（该怎么办）：{form.provider === 'offline' || !form.baseUrl
+                ? '本机规则引擎（没配对话模型也能给出报警、路线与疏散指令）'
+                : `本地对话模型（${form.model || '已配置端点'}）`}
+            </li>
+            <li>两者独立：只装 YOLO = 感知更准 + 规则决策；只装对话模型 = 决策会写话 + 但没有火焰/烟雾识别</li>
+          </ul>
+        </div>
+
         <div className="ai-sheet-actions">
           <button type="button" className="sheet-save" onClick={persist}><Save size={16} />保存设置</button>
           <button type="button" onClick={test} disabled={offline || probe === 'testing'}>

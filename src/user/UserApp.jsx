@@ -452,6 +452,8 @@ export default function UserApp() {
         position,
         gps: { status: gps.status, location: gps.location ?? null },
         plan: planRoute ? { name: activePlan?.name, route: planRoute } : null,
+        // 感知来源：装了 YOLO 的现场，决策文案里会带上视觉证据
+        perception: aiSettings.visionUrl ? { source: 'yolo' } : null,
       }, aiSettings).then((result) => {
         if (!cancelled) setAiResult(result)
       })
