@@ -78,6 +78,31 @@ function detectHotspots(width, height, temperatures, maxTemp, averageTemp) {
   }))
 }
 
+// 把任意来源的 32×24 温度矩阵包装成系统统一的 frame 结构。
+// 硬件（MLX90640 经 Wi-Fi 上传）走的就是这条路：帧格式与内置模拟器完全一致，
+// 于是三维热感板、报警阈值、危险场与疏散算法都不需要改。
+export function frameFromMatrix({ width = 32, height = 24, temperatures, source = '外部热像源', timestamp } = {}, thresholds = DEFAULT_THRESHOLDS) {
+  const list = Array.isArray(temperatures) ? temperatures.map(Number) : []
+  if (list.length !== width * height || list.some((value) => !Number.isFinite(value))) {
+    return null
+  }
+  const maxTemp = Math.max(...list)
+  const minTemp = Math.min(...list)
+  const averageTemp = list.reduce((sum, value) => sum + value, 0) / list.length
+  return {
+    width,
+    height,
+    temperatures: list,
+    minTemp,
+    maxTemp,
+    averageTemp,
+    risk: riskFromMaxTemp(maxTemp, thresholds),
+    hotspots: detectHotspots(width, height, list, maxTemp, averageTemp),
+    source,
+    timestamp: timestamp ? new Date(timestamp) : new Date(),
+  }
+}
+
 export function createFrame(phase = 0, profile = 'normal') {
   const width = 32
   const height = 24

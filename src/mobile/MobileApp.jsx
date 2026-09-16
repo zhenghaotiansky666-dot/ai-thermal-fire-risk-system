@@ -1500,7 +1500,13 @@ export default function MobileApp() {
     if (activeTab === 'camera') {
       return (
         <>
-          <HardwareFeed />
+          <HardwareFeed
+            onFrame={(nextFrame) => {
+              // 硬件热像接入检测链路：帧结构一致，报警阈值/危险场/疏散自动复用
+              setFrame(nextFrame)
+              setResult(nextFrame)
+            }}
+          />
           <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
         </>
       )

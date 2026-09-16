@@ -6,15 +6,19 @@
 // 页面通过同源 /hw/* 代理读取（HTTPS 页面不能直接访问 http://host:5000）
 
 import { useEffect, useState } from 'react'
-import { Activity, Camera, Cpu, Flame, RefreshCw, Wifi } from 'lucide-react'
+import { Activity, Camera, Cpu, Flame, Link2, RefreshCw, Wifi } from 'lucide-react'
+import { frameFromMatrix } from './thermal.js'
+import { describeFreshness } from '../shared/freshness.js'
 
 const POLL_MS = 2000
 
-export default function HardwareFeed() {
+export default function HardwareFeed({ onFrame }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
   const [online, setOnline] = useState(null)
+  const [drive, setDrive] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     let cancelled = false
@@ -35,16 +39,47 @@ export default function HardwareFeed() {
     }
     load()
     const timer = window.setInterval(load, POLL_MS)
+    const clock = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.clearInterval(clock)
+    }
+  }, [tick])
+
+  // 「用硬件热像驱动检测」：把 MLX90640 上传的矩阵变成系统统一帧，
+  // 于是三维热感板、报警阈值、危险场与疏散算法全部用真实传感器数据（而不是模拟器）
+  useEffect(() => {
+    if (!drive || !onFrame || !data?.thermal) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const response = await fetch('./hw/thermal.json', { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = await response.json()
+        const frame = frameFromMatrix({
+          width: 32,
+          height: 24,
+          temperatures: payload.sensor_data,
+          source: '硬件 MLX90640（Wi-Fi 上传）',
+          timestamp: payload.at,
+        })
+        if (frame && !cancelled) onFrame(frame)
+      } catch {}
+    }
+    load()
+    const timer = window.setInterval(load, POLL_MS)
     return () => {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [tick])
+  }, [drive, onFrame, data?.thermal?.at])
 
   const visible = data?.visible ?? null
   const thermal = data?.thermal ?? null
   const log = data?.log ?? []
   const hot = thermal && thermal.maxTemp >= (data?.yesTemp ?? 70)
+  const freshness = describeFreshness(thermal?.at, now)
 
   return (
     <section className="mobile-card hardware-card">
@@ -105,6 +140,20 @@ export default function HardwareFeed() {
             <div><span><Cpu size={13} />报警阈值</span><strong>{data?.yesTemp ?? 70}°C</strong></div>
             <div><span><Flame size={13} />最近终审</span><strong>{visible ? visible.decision : '—'}</strong></div>
           </div>
+
+          <div className={`hardware-link ${freshness.state}`}>
+            <Wifi size={14} />
+            <span>{freshness.state === 'live' ? '硬件在线' : freshness.state === 'stale' ? '硬件疑似离线' : '等待硬件'}</span>
+            <em>{freshness.label}</em>
+          </div>
+
+          <label className="hardware-drive">
+            <input type="checkbox" checked={drive} onChange={(event) => setDrive(event.target.checked)} />
+            <span>
+              <b><Link2 size={13} />用硬件热像驱动检测</b>
+              <small>打开后，三维热感板、报警阈值、危险场与疏散路线都用这块 MLX90640 的真实数据（不再用内置模拟器）</small>
+            </span>
+          </label>
 
           {log.length > 0 && (
             <ul className="hardware-log">

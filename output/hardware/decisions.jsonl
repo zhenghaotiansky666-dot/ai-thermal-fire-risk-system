@@ -4,3 +4,7 @@
 {"at":1789536582917,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 86.5°C（阈值 70°C）"}
 {"at":1789536661719,"answer":"DATA","source":"thermal-upload","reason":"最高温 86.5°C，768 个温度点"}
 {"at":1789536661726,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 86.5°C（阈值 70°C）"}
+{"at":1789536921101,"answer":"DATA","source":"thermal-upload","reason":"最高温 86.3°C，768 个温度点"}
+{"at":1789536921109,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 86.3°C（阈值 70°C）"}
+{"at":1789537043184,"answer":"DATA","source":"thermal-upload","reason":"最高温 85.4°C，768 个温度点"}
+{"at":1789537043191,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 85.4°C（阈值 70°C）"}
