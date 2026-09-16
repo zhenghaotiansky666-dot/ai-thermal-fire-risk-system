@@ -66,6 +66,7 @@ import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from '
 import HardwareFeed from './HardwareFeed.jsx'
 import SpeakerPanel from './SpeakerPanel.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
+import { aiStatus, autoDiscoverAi, subscribeAiStatus } from '../shared/aiClient.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
 import LinkSheet from './LinkSheet.jsx'
 import { createEvent, fireFromEvent, peerReportSummary, sharedEventBus } from '../shared/eventBus.js'
@@ -782,6 +783,7 @@ export default function MobileApp() {
   const [frameHistory, setFrameHistory] = useState([])
   const [rescueBrief, setRescueBrief] = useState(null)
   const [showLinkSheet, setShowLinkSheet] = useState(false)
+  const [aiState, setAiState] = useState(() => aiStatus())
   const [peerEvents, setPeerEvents] = useState([])
   // 最近一条"还没处置"的用户端上报（系统端横幅用它提醒指挥人员）
   const [peerReport, setPeerReport] = useState(null)
@@ -827,6 +829,14 @@ export default function MobileApp() {
   const inputCameraRef = useRef(null)
   const inputGalleryRef = useRef(null)
   const armedRef = useRef(true)
+
+  // AI 状态条：打开系统端就自动检测本机模型（Ollama / LM Studio / 本站代理 / YOLO），
+  // 检测到就自动接上——每个系统端后面都带 AI，不需要谁去手动填地址。
+  useEffect(() => {
+    const unsubscribe = subscribeAiStatus(setAiState)
+    autoDiscoverAi()
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('thermalGuardDevices', JSON.stringify(devices))
@@ -1640,8 +1650,15 @@ export default function MobileApp() {
         </span>
         <div className="top-actions">
           <ConnectionBadge state={connection} />
-          <button type="button" className="ai-entry" title="AI 指挥 · 本地模型接口" onClick={() => setShowAiSheet(true)}>
-            <Cpu size={15} /><span>AI 指挥</span>
+          <button
+            type="button"
+            className={`ai-entry ai-entry-${aiState.probing ? 'probing' : aiState.tone}`}
+            title={`AI 指挥 · ${aiState.label}\n${aiState.detail}`}
+            onClick={() => setShowAiSheet(true)}
+          >
+            <Cpu size={15} />
+            <span>{aiState.probing ? 'AI 检测中' : aiState.chip || 'AI 指挥'}</span>
+            <em className="ai-dot" />
           </button>
           <button type="button" className="ai-entry link-entry" title="两端联通 · 局域网中继与离线码" onClick={() => setShowLinkSheet(true)}>
             <Link2 size={15} /><span>链路</span>

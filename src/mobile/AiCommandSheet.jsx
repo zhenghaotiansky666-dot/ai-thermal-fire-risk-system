@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { Cpu, RefreshCw, Save, Server, Stethoscope, TriangleAlert, X } from 'lucide-react'
 import { aiReachable, listAiProviders, providerPreset, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
+import { aiDiscoveryState, aiStatus, autoDiscoverAi, subscribeAiStatus } from '../shared/aiClient.js'
 import { integrationStatus, subscribeIntegrations } from '../shared/aiHooks.js'
 import { buildAiPairUrl } from '../shared/aiPairing.js'
 import { probeVision } from '../shared/visionClient.js'
@@ -24,9 +25,23 @@ export default function AiCommandSheet({ onClose, onSaved }) {
   const [pairQr, setPairQr] = useState('')
   const [pairUrl, setPairUrl] = useState('')
   const [visionProbe, setVisionProbe] = useState('')
+  const [autoStatus, setAutoStatus] = useState(() => aiStatus())
+  const [autoProbe, setAutoProbe] = useState('')
 
   // 队友在控制台里注册能力后，这个面板会立刻反映"已接入"
   useEffect(() => subscribeIntegrations(() => setStatus(integrationStatus())), [])
+
+  // 自动检测本机的模型服务（Ollama / LM Studio / 本站代理 / YOLO），检测到就自动接上
+  useEffect(() => subscribeAiStatus(setAutoStatus), [])
+
+  const rerunDetect = async () => {
+    setAutoProbe('probing')
+    const found = await autoDiscoverAi({ force: true })
+    setForm(readAiSettings())
+    setAutoProbe(found?.chat || found?.vision ? 'ok' : 'none')
+  }
+
+  const discovered = aiDiscoveryState()
 
   const patch = (next) => setForm((current) => ({ ...current, ...next }))
   const offline = form.provider === 'offline'
@@ -171,6 +186,31 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           />
           该模型支持读图（视觉模型，用于复核用户上传的疏散路线图）
         </label>
+
+        <div className="ai-sheet-section">
+          <strong>本机 AI 自动检测（每个系统端打开都会自动找）</strong>
+          <p className={`ai-autodetect-line tone-${autoStatus.probing ? 'probing' : autoStatus.tone}`}>
+            {autoStatus.probing ? '正在检测本机的模型服务…' : autoStatus.label}
+          </p>
+          <p className="ai-sheet-hint">{autoStatus.detail}</p>
+          <ul className="ai-autodetect-list">
+            <li>决策通道：{autoStatus.chatReady ? (form.baseUrl || discovered?.chat?.baseUrl || '已接入') : '未接入 → 用本机规则引擎'}</li>
+            <li>感知通道：{autoStatus.visionReady ? (form.visionUrl || discovered?.vision?.baseUrl || '已接入') : '未接入 → 用热像与演示数据'}</li>
+            {discovered?.chat?.label ? <li>自动发现：{discovered.chat.label}</li> : null}
+            {discovered?.vision?.label ? <li>自动发现：{discovered.vision.label}{discovered.vision.mock ? '（演示假服务，非真模型）' : ''}</li> : null}
+          </ul>
+          <div className="ai-sheet-actions">
+            <button type="button" onClick={rerunDetect} disabled={autoProbe === 'probing'}>
+              <RefreshCw size={15} /> {autoProbe === 'probing' ? '正在检测…' : '重新检测本机模型'}
+            </button>
+            {autoProbe === 'none' && <span className="ai-probe is-fail">没找到本机模型：规则引擎继续兜底</span>}
+            {autoProbe === 'ok' && <span className="ai-probe is-ok">已自动接上</span>}
+          </div>
+          <p className="ai-sheet-hint">
+            现场做法：在<b>跑系统端这台机器</b>上双击 <code>启动本地AI.command / .bat</code>，它会拉起 Ollama、站点与中继；
+            之后<b>任何</b>打开系统端的电脑都会自动发现并接上，不用再手填地址。
+          </p>
+        </div>
 
         <div className="ai-sheet-section">
           <strong>视觉通道（YOLO 火焰 / 烟雾检测）</strong>

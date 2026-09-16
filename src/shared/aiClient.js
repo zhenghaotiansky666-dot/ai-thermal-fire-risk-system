@@ -10,6 +10,7 @@
 //   · 密钥只存在本机 localStorage，不随任何埋点上报。
 
 import { buildNeighborNotice, buildPhaseMessages, fusePreventionSignals } from './aiPhases.js'
+import { describeAiStatus, discoverAiEndpoints } from './aiDiscovery.js'
 import { describeVitalSigns } from './vitalSigns.js'
 import {
   getVitalSensor,
@@ -181,8 +182,82 @@ export async function bootstrapAiConfig() {
     if (isDefault) saveAreaChannels(presetAreas)
   }
   installGlobalAiApi()
+  // 自动发现本机 AI：不阻塞首屏（main.jsx 会 await 本函数），发现到了再通过订阅通知界面
+  autoDiscoverAi()
   installVisionBridgeFromSettings()
   return readAiSettings()
+}
+
+// ---------------------------------------------------------------- 本机 AI 自动发现
+//
+// 目标：让"每一个系统端"打开就自带 AI，而不是只有配过的那台机器能看到。
+// 规则：只补"没配过"的那一项，绝不覆盖用户在界面里填过或 ai-config.json 里显式写死的地址。
+
+let discovery = null
+let discoveryPromise = null
+let discovering = false
+const discoveryListeners = new Set()
+
+export function subscribeAiStatus(listener) {
+  discoveryListeners.add(listener)
+  return () => discoveryListeners.delete(listener)
+}
+
+function emitAiStatus() {
+  const status = aiStatus()
+  discoveryListeners.forEach((fn) => {
+    try {
+      fn(status)
+    } catch {
+      /* 单个订阅者出错不影响其它人 */
+    }
+  })
+}
+
+// 当前 AI 状态：谁在感知、谁在决策、是不是演示假服务
+export function aiStatus() {
+  return {
+    ...describeAiStatus({ settings: readAiSettings(), vision: discovery?.vision, discovered: discovery }),
+    // 首屏正在探测本机模型时，界面显示"检测中"而不是"没有 AI"
+    probing: discovering && !discovery,
+  }
+}
+
+export function aiDiscoveryState() {
+  return discovery ? { ...discovery } : null
+}
+
+export async function autoDiscoverAi({ force = false } = {}) {
+  if (discoveryPromise && !force) return discoveryPromise
+  discovering = true
+  emitAiStatus()
+  discoveryPromise = (async () => {
+    try {
+      const found = await discoverAiEndpoints()
+      const settings = readAiSettings()
+      const patch = {}
+      if (found.chat && !settings.baseUrl) {
+        patch.provider = 'custom'
+        patch.baseUrl = found.chat.baseUrl
+        if (found.chat.model) patch.model = found.chat.model
+      }
+      if (found.vision && !settings.visionUrl) patch.visionUrl = found.vision.baseUrl
+      discovery = found
+      if (Object.keys(patch).length) {
+        // 走"外部配置"而不是写 localStorage：自动发现不该被当成用户手工设置固化下来，
+        // 下次换机器/换端口时会重新探测。
+        setExternalAiConfig({ ...(getExternalAiConfig() || {}), ...patch })
+        installVisionBridgeFromSettings()
+      }
+      return found
+    } catch {
+      return null
+    } finally {
+      discovering = false
+      emitAiStatus()
+    }
+  })()
+  return discoveryPromise
 }
 
 // 只要配置了视觉服务地址，就把它接进「视觉通道」——队友只要填一个地址，阶段一就会用 YOLO 的结果

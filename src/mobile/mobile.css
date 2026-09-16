@@ -1877,6 +1877,19 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 }
 .ai-entry:hover,
 .peer-link:hover { border-color: rgba(56, 189, 248, .5); color: #7dd3fc; }
+/* AI 状态点：绿=决策+感知都就绪，蓝=只有对话模型，青=只有视觉，琥珀=规则兜底，红=演示假服务 */
+.ai-entry .ai-dot {
+  width: 7px; height: 7px; margin-left: 1px; border-radius: 50%;
+  background: #94a3b8; box-shadow: 0 0 6px currentColor;
+}
+.ai-entry-full .ai-dot, .ai-entry-chat .ai-dot { background: #22c55e; }
+.ai-entry-vision .ai-dot { background: #38bdf8; }
+.ai-entry-rules .ai-dot { background: #f59e0b; }
+.ai-entry-warn .ai-dot { background: #ef4444; }
+.ai-entry-probing .ai-dot { background: #94a3b8; animation: aiDotPulse 1s ease-in-out infinite; }
+.ai-entry-full { border-color: rgba(34, 197, 94, .45); color: #bbf7d0; }
+.ai-entry-warn { border-color: rgba(239, 68, 68, .5); color: #fecaca; }
+@keyframes aiDotPulse { from { opacity: .35; } to { opacity: 1; } }
 .peer-link svg,
 .ai-entry svg { flex: 0 0 auto; }
 /* 角标放进胶囊内部：原来绝对定位挂在框外，看起来像"跑出方框" */
@@ -2138,6 +2151,15 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .speaker-actions button:disabled { opacity: .45; }
 .hardware-stats strong.is-live { color: #8fe8b3; }
 .ai-pair { padding: 11px 12px; border: 1px solid rgba(56,189,248,.32); border-radius: 12px; background: rgba(14,165,233,.1); display: flex; flex-direction: column; gap: 8px; }
+/* AI 自动检测块 */
+.ai-autodetect-line { margin: 6px 0 0; font-size: 11px; font-weight: 700; color: #dcecff; }
+.ai-autodetect-line.tone-full, .ai-autodetect-line.tone-chat { color: #8fe8b3; }
+.ai-autodetect-line.tone-vision { color: #9ad6ff; }
+.ai-autodetect-line.tone-rules { color: #ffd39a; }
+.ai-autodetect-line.tone-warn { color: #ffb4a8; }
+.ai-autodetect-line.tone-probing { color: #9fb4c8; }
+.ai-autodetect-list { margin: 7px 0 0; padding-left: 16px; color: #9db6cf; font-size: 9px; line-height: 1.8; }
+.ai-autodetect-list code { color: #9ad6ff; }
 .ai-pair > strong { color: #dcecff; font-size: 10px; }
 .ai-pair img { display: block; width: 180px; height: 180px; margin: 0 auto; padding: 6px; border-radius: 12px; background: #fff; }
 .ai-pair textarea { width: 100%; padding: 8px 10px; color: #9ad6ff; border: 1px solid rgba(56,189,248,.24); border-radius: 9px; background: rgba(2,10,22,.7); font-size: 8px; resize: none; }
