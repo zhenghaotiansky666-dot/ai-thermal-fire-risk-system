@@ -7,7 +7,7 @@
 // 设置存在 localStorage（键在 src/shared/aiClient.js 里统一定义），密钥不出本机。
 
 import { useEffect, useState } from 'react'
-import { Cpu, RefreshCw, Save, Server, TriangleAlert, X } from 'lucide-react'
+import { Cpu, RefreshCw, Save, Server, Stethoscope, TriangleAlert, X } from 'lucide-react'
 import { aiReachable, listAiProviders, providerPreset, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
 import { integrationStatus, subscribeIntegrations } from '../shared/aiHooks.js'
 
@@ -16,6 +16,8 @@ export default function AiCommandSheet({ onClose, onSaved }) {
   const [probe, setProbe] = useState('')
   const [saved, setSaved] = useState('')
   const [status, setStatus] = useState(() => integrationStatus())
+  const [diagnose, setDiagnose] = useState(null)
+  const [diagnosing, setDiagnosing] = useState(false)
 
   // 队友在控制台里注册能力后，这个面板会立刻反映"已接入"
   useEffect(() => subscribeIntegrations(() => setStatus(integrationStatus())), [])
@@ -34,6 +36,31 @@ export default function AiCommandSheet({ onClose, onSaved }) {
     setSaved('已保存到本机，用户端会自动使用同一份设置')
     onSaved?.(next)
     window.setTimeout(() => setSaved(''), 3200)
+  }
+
+  // 一键诊断：让本地服务器替页面去探模型端口（浏览器自己探不了 127.0.0.1 之外的内网地址）
+  const runDiagnose = async () => {
+    setDiagnosing(true)
+    setDiagnose(null)
+    try {
+      const response = await fetch(`./ai/diagnose?model=${encodeURIComponent(form.model || '')}`, { cache: 'no-store' })
+      if (!response.ok) throw new Error(`http-${response.status}`)
+      setDiagnose(await response.json())
+    } catch (error) {
+      setDiagnose({
+        ok: false,
+        summary: { headline: '当前页面不是通过本地服务器打开的，无法在页面里诊断' },
+        checks: [{
+          id: 'not-local',
+          level: 'fail',
+          title: '诊断需要本地服务器（tools/local-ai-server.mjs）',
+          detail: String(error?.message ?? error),
+          remedy: '在跑模型的电脑上执行 node tools/setup-local-ai.mjs，然后用它打印的地址打开本页',
+        }],
+      })
+    } finally {
+      setDiagnosing(false)
+    }
   }
 
   return (
@@ -117,10 +144,28 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           <button type="button" onClick={test} disabled={offline || probe === 'testing'}>
             <RefreshCw size={15} /> {probe === 'testing' ? '正在测试…' : '测试连接'}
           </button>
+          <button type="button" onClick={runDiagnose} disabled={diagnosing}>
+            <Stethoscope size={15} /> {diagnosing ? '诊断中…' : '一键诊断'}
+          </button>
           <span className={`ai-probe ${probe === 'ok' ? 'is-ok' : probe === 'fail' ? 'is-fail' : ''}`}>
             {probe === 'ok' ? '端点可用，将由本地模型接管' : probe === 'fail' ? '端点不可用（仍可使用规则引擎）' : '未测试'}
           </span>
         </div>
+
+        {diagnose && (
+          <div className={`ai-diagnose ${diagnose.ok ? 'is-ok' : 'is-bad'}`}>
+            <strong>{diagnose.summary?.headline ?? '诊断完成'}</strong>
+            <ul>
+              {(diagnose.checks ?? []).map((check) => (
+                <li key={check.id} className={`level-${check.level}`}>
+                  <span>{check.level === 'pass' ? '✅' : check.level === 'warn' ? '⚠️' : '❌'} {check.title}</span>
+                  {check.remedy && <em>怎么修：{check.remedy}</em>}
+                </li>
+              ))}
+            </ul>
+            {diagnose.hints?.lanSite && <p>队友/手机请打开：{diagnose.hints.lanSite}，端点填 {diagnose.hints.endpointForBrowser}</p>}
+          </div>
+        )}
 
         {saved && <div className="ai-sheet-saved">{saved}</div>}
 

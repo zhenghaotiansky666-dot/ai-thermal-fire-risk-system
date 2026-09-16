@@ -22,6 +22,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { networkInterfaces } from 'node:os'
 import { extname, join, normalize, resolve } from 'node:path'
 import { createRequire } from 'node:module'
+import { runDoctor, formatReport } from './ai-doctor.mjs'
 
 const args = process.argv.slice(2)
 const readArg = (name, fallback) => {
@@ -288,6 +289,17 @@ createServer(async (request, response) => {
   }
   if (url.pathname === '/join' || url.pathname === '/join.html') {
     await serveJoinPage(response, port)
+    return
+  }
+  // 浏览器的「一键诊断」：服务端替页面去探模型端口，绕开跨域与私网限制
+  if (url.pathname === '/ai/diagnose') {
+    const report = await runDoctor({
+      upstream,
+      model: url.searchParams.get('model') || undefined,
+      siteBase: `http://127.0.0.1:${port}`,
+    })
+    response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' })
+    response.end(JSON.stringify({ ...report, text: formatReport(report) }))
     return
   }
   if (url.pathname === '/ai' || url.pathname.startsWith('/ai/')) {
