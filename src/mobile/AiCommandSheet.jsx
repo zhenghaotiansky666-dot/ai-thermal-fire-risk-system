@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { Cpu, RefreshCw, Save, Server, Stethoscope, TriangleAlert, X } from 'lucide-react'
 import { aiReachable, listAiProviders, providerPreset, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
 import { integrationStatus, subscribeIntegrations } from '../shared/aiHooks.js'
+import { buildAiPairUrl } from '../shared/aiPairing.js'
 
 export default function AiCommandSheet({ onClose, onSaved }) {
   const [form, setForm] = useState(() => readAiSettings())
@@ -18,6 +19,8 @@ export default function AiCommandSheet({ onClose, onSaved }) {
   const [status, setStatus] = useState(() => integrationStatus())
   const [diagnose, setDiagnose] = useState(null)
   const [diagnosing, setDiagnosing] = useState(false)
+  const [pairQr, setPairQr] = useState('')
+  const [pairUrl, setPairUrl] = useState('')
 
   // 队友在控制台里注册能力后，这个面板会立刻反映"已接入"
   useEffect(() => subscribeIntegrations(() => setStatus(integrationStatus())), [])
@@ -60,6 +63,25 @@ export default function AiCommandSheet({ onClose, onSaved }) {
       })
     } finally {
       setDiagnosing(false)
+    }
+  }
+
+  // 生成「AI 配置配对」二维码：另一台电脑扫码即可自动填好端点与模型
+  const buildPairing = async () => {
+    const base = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}mobile-app.html`
+    const model = diagnose?.hints?.matchedModel || form.model
+    const url = buildAiPairUrl(base, {
+      baseUrl: diagnose?.hints?.endpointForBrowser || form.baseUrl || '/ai/v1',
+      model,
+      vision: Boolean(form.vision),
+      label: '热感哨兵 AI',
+    })
+    setPairUrl(url)
+    try {
+      const { default: QRCode } = await import('qrcode')
+      setPairQr(await QRCode.toDataURL(url, { margin: 1, width: 320, errorCorrectionLevel: 'M' }))
+    } catch {
+      setPairQr('')
     }
   }
 
@@ -161,6 +183,9 @@ export default function AiCommandSheet({ onClose, onSaved }) {
               <Cpu size={15} /> 应用推荐设置
             </button>
           )}
+          <button type="button" onClick={buildPairing}>
+            <Server size={15} /> 生成配对二维码
+          </button>
           <span className={`ai-probe ${probe === 'ok' ? 'is-ok' : probe === 'fail' ? 'is-fail' : ''}`}>
             {probe === 'ok' ? '端点可用，将由本地模型接管' : probe === 'fail' ? '端点不可用（仍可使用规则引擎）' : '未测试'}
           </span>
@@ -182,6 +207,17 @@ export default function AiCommandSheet({ onClose, onSaved }) {
         )}
 
         {saved && <div className="ai-sheet-saved">{saved}</div>}
+
+        {pairUrl && (
+          <div className="ai-pair">
+            <strong>让另一台电脑/手机扫这个码</strong>
+            {pairQr
+              ? <img src={pairQr} alt="AI 配置配对二维码" />
+              : <textarea readOnly rows={2} value={pairUrl} onFocus={(event) => event.target.select()} />}
+            <textarea readOnly rows={2} value={pairUrl} onFocus={(event) => event.target.select()} />
+            <small>扫码打开的系统端会自动填好「端点地址」与「模型名」，点一次「保存设置」就能用，不用手输 IP。</small>
+          </div>
+        )}
 
         <div className="ai-sheet-status">
           <strong>接入状态（队友在这里对接，界面会自动生效）</strong>

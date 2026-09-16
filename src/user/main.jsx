@@ -5,6 +5,8 @@ import { bootstrapAiConfig } from '../shared/aiClient.js'
 import { extractChannelFromSearch } from '../shared/geoChannels.js'
 import { readCloudChannel, saveCloudChannel } from '../shared/eventBus.js'
 import { startUpdateWatch } from '../shared/updateCheck.js'
+import { extractAiPairingFromSearch } from '../shared/aiPairing.js'
+import { readAiSettings, saveAiSettings } from '../shared/aiClient.js'
 import './user.css'
 
 // 扫码进入演示：二维码里带 ?ch=频道，先落地频道再做其他初始化
@@ -12,6 +14,18 @@ import './user.css'
 const joinChannel = extractChannelFromSearch(typeof window === 'undefined' ? '' : window.location.search)
 if (joinChannel && joinChannel !== readCloudChannel()) {
   saveCloudChannel(joinChannel)
+}
+
+// 扫「AI 配置配对」二维码进来的：自动填好 AI 端点与模型
+const paired = extractAiPairingFromSearch(typeof window === 'undefined' ? '' : window.location.search)
+if (paired) {
+  const current = readAiSettings()
+  saveAiSettings({
+    provider: 'custom',
+    baseUrl: paired.baseUrl,
+    model: paired.model || current.model,
+    ...(paired.vision ? { vision: true } : {}),
+  })
 }
 
 // 先把 AI 接入配置读进来（window.THERMAL_GUARD_AI / ai-config.json），再渲染界面，
