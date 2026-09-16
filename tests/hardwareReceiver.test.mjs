@@ -1,12 +1,15 @@
 // 硬件接收端纯逻辑单测：固件两种上传格式的解析、热像渲染、终审决策
 
 import {
+  buildAlertPhrase,
   decideFire,
   encodePng,
   extractImage,
   parseMultipart,
   parseThermalPayload,
+  pickTtsCommand,
   renderThermalPng,
+  shouldSpeak,
   temperatureColor,
 } from '../tools/hardware-receiver.mjs'
 
@@ -86,6 +89,30 @@ console.log('[5] 终审决策（固件只看 YES / NO）')
 
   const unreachable = await decideFire({ jpegBuffer: JPEG, thermal: null, visionUrl: 'http://127.0.0.1:1' })
   check('视觉服务不可用时不抛错', unreachable.answer === 'NO')
+}
+
+console.log('[6] 现场语音播报（路过的人也能知道）')
+{
+  const first = buildAlertPhrase({ maxTemp: 86.4 })
+  check('首次播报含"发生火灾"与撤离指引', first.includes('发生火灾') && first.includes('撤离') && first.includes('不要乘坐电梯'))
+  check('播报里带上温度', first.includes('86'))
+  const repeat = buildAlertPhrase({ maxTemp: 86.4, repeat: true })
+  check('重复播报文案不同（不会像卡带）', repeat !== first && repeat.includes('仍然'))
+  check('缺温度时不报 NaN', !buildAlertPhrase({}).includes('NaN'))
+
+  const mac = pickTtsCommand('darwin', '测试')
+  check('macOS 用系统 say（可指定中文voice）', mac.cmd === 'say' && mac.args.includes('Ting-Ting'))
+  const win = pickTtsCommand('win32', "他说'着火了'")
+  check('Windows 用 PowerShell 的 System.Speech', win.cmd === 'powershell' && win.args.join(' ').includes('System.Speech'))
+  check('Windows 文案里的单引号被转义（防注入/语法错）', win.args.join(' ').includes("''"))
+  const linux = pickTtsCommand('linux', '测试')
+  check('Linux 用 espeak', linux.cmd === 'espeak')
+  const override = pickTtsCommand('darwin', 'x', '/bin/echo')
+  check('可以覆盖播报命令（便于测试/换成外接音箱脚本）', override.cmd === '/bin/echo')
+
+  check('首次一定播报', shouldSpeak(1000, 0, 20000) === true)
+  check('间隔内不重复播报', shouldSpeak(11000, 1000, 20000) === false)
+  check('超过间隔再次播报', shouldSpeak(25000, 1000, 20000) === true)
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

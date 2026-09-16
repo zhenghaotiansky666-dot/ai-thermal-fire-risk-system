@@ -8,3 +8,9 @@
 {"at":1789536921109,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 86.3°C（阈值 70°C）"}
 {"at":1789537043184,"answer":"DATA","source":"thermal-upload","reason":"最高温 85.4°C，768 个温度点"}
 {"at":1789537043191,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 85.4°C（阈值 70°C）"}
+{"at":1789537468828,"answer":"DATA","source":"thermal-upload","reason":"最高温 85.3°C，768 个温度点"}
+{"at":1789537468837,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 85.3°C（阈值 70°C）"}
+{"at":1789537468840,"answer":"SPEAK","source":"alert-speak","reason":"注意，这里发生火灾，最高温度 85 度，请立即沿安全出口撤离，不要乘坐电梯。"}
+{"at":1789537469945,"answer":"DATA","source":"thermal-upload","reason":"最高温 85.5°C，768 个温度点"}
+{"at":1789537469952,"bytes":264016,"contentType":"image/jpeg","decision":"YES","source":"thermal","reason":"热像最高温 85.5°C（阈值 70°C）"}
+{"at":1789537469952,"answer":"SPEAK","source":"alert-speak","reason":"这里仍然有火情，最高温度 86 度，请尽快离开。"}

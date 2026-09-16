@@ -21,6 +21,19 @@ import { createServer as createProbeServer } from 'node:net'
 import { mkdir, appendFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { deflateSync } from 'node:zlib'
+import { spawn } from 'node:child_process'
+import { networkInterfaces } from 'node:os'
+
+function lanAddresses() {
+  const out = []
+  const interfaces = networkInterfaces()
+  Object.values(interfaces).forEach((list) => {
+    (list ?? []).forEach((item) => {
+      if (item.family === 'IPv4' && !item.internal) out.push(item.address)
+    })
+  })
+  return out
+}
 
 const args = process.argv.slice(2)
 const readArg = (name, fallback) => {
@@ -38,6 +51,30 @@ const yesTemp = Number(readArg('--yes-temp', '70'))
 const outDir = resolve(readArg('--out', 'output/hardware'))
 const alwaysYes = hasFlag('--always-yes')
 const keepFrames = Number(readArg('--keep', '20'))
+const printFirmware = hasFlag('--print-firmware')
+// 现场"路过的人也能知道"：确认火灾后用这台电脑的扬声器播报（零安装、不需要网络）
+const speak = !hasFlag('--no-speak')
+const speakRepeatSec = Number(readArg('--speak-repeat', '20'))
+const speakCommandOverride = readArg('--speak-cmd', '')
+
+// ---------------------------------------------------------------- 语音播报（把电脑扬声器当现场广播）
+export function pickTtsCommand(platform, text, override = '') {
+  if (override) return { cmd: override, args: [text] }
+  if (platform === 'darwin') return { cmd: 'say', args: ['-v', 'Ting-Ting', text] }
+  if (platform === 'win32') {
+    return {
+      cmd: 'powershell',
+      args: ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text.replace(/'/g, "''")}')`],
+    }
+  }
+  return { cmd: 'espeak', args: [text] }
+}
+
+export function buildAlertPhrase({ maxTemp, smoke, repeat = false } = {}) {
+  const where = Number.isFinite(Number(maxTemp)) ? `最高温度 ${Math.round(maxTemp)} 度` : '检测到异常热源'
+  if (repeat) return `这里仍然有火情，${where}，请尽快离开。`
+  return `注意，这里发生火灾，${where}，请立即沿安全出口撤离，不要乘坐电梯。`
+}
 
 const store = {
   visible: [],   // { at, bytes, contentType, jpeg: Buffer, decision, source }
@@ -286,6 +323,33 @@ function pushLog(entry) {
   appendFile(resolve(outDir, 'decisions.jsonl'), `${JSON.stringify(entry)}\n`).catch(() => {})
 }
 
+// 播报节流：第一次立刻播，之后每 speakRepeatSec 秒重复一次（火灾持续期间持续提醒）
+let lastSpokenAt = 0
+let spokenCount = 0
+export function shouldSpeak(now, lastAt, repeatMs) {
+  if (!lastAt) return true
+  return now - lastAt >= repeatMs
+}
+
+function speakAlert({ maxTemp, smoke }) {
+  if (!speak) return
+  const now = Date.now()
+  if (!shouldSpeak(now, lastSpokenAt, speakRepeatSec * 1000)) return
+  const repeat = spokenCount > 0
+  const phrase = buildAlertPhrase({ maxTemp, smoke, repeat })
+  const { cmd, args } = pickTtsCommand(process.platform, phrase, speakCommandOverride)
+  lastSpokenAt = now
+  spokenCount += 1
+  try {
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore' })
+    child.on('error', () => {})
+    child.unref()
+    console.log(`[alert-speak] 现场播报：${phrase}`)
+  } catch (error) {
+    console.warn(`[alert-speak] 播报失败：${error.message}`)
+  }
+}
+
 async function readBody(request, limitBytes = 8 * 1024 * 1024) {
   const chunks = []
   let size = 0
@@ -380,8 +444,20 @@ const server = createServer(async (request, response) => {
       store.visible.unshift({ ...record, jpeg: parsed.jpeg })
       if (store.visible.length > keepFrames) store.visible.length = keepFrames
       await writeFile(resolve(outDir, 'latest.jpg'), parsed.jpeg).catch(() => {})
-      pushLog(record)
+      // 日志条目统一成 {answer, source, reason}，前端直接渲染
+      pushLog({
+        at: record.at,
+        answer: decision.answer,
+        source: decision.source,
+        reason: decision.reason,
+        bytes: record.bytes,
+      })
       console.log(`[upload] ${(parsed.jpeg.length / 1024).toFixed(1)} KB → ${decision.answer}（${decision.source}：${decision.reason}）`)
+      // 确认火灾就现场播报（路过的人也能听到），并写进日志
+      if (decision.answer === 'YES') {
+        speakAlert({ maxTemp: latestThermal?.maxTemp, smoke: null })
+        pushLog({ at: Date.now(), answer: 'SPEAK', source: 'alert-speak', reason: buildAlertPhrase({ maxTemp: latestThermal?.maxTemp, repeat: spokenCount > 1 }) })
+      }
       // 固件用 HTTPClient.getString() 和 "YES" 做字符串比较，所以这里必须返回恰好这两个字母
       text(response, 200, decision.answer)
       return
@@ -513,6 +589,14 @@ function printBanner() {
     console.log(`⚠️ 实际端口是 ${activePort}（不是 ${port}）：固件里 serverUrl / thermalServerUrl 的端口要一并改成 ${activePort}`)
     console.log(`   例如：const char* serverUrl = "http://<电脑IP>:${activePort}/upload";`)
     console.log(`         const char* thermalServerUrl = "http://<电脑IP>:${activePort}/upload_thermal";`)
+  }
+  if (printFirmware) {
+    const lan = lanAddresses()[0] ?? '127.0.0.1'
+    console.log('')
+    console.log('== 复制到 ESP32 固件的两行（把 IP 换成这台电脑的局域网地址）==')
+    console.log(`const char* serverUrl        = "http://${lan}:${activePort}/upload";`)
+    console.log(`const char* thermalServerUrl = "http://${lan}:${activePort}/upload_thermal";`)
+    console.log('（原来的 thermalServerUrl 是 "http://10.240.250"，少了端口与路径，必须替换）')
   }
 }
 
