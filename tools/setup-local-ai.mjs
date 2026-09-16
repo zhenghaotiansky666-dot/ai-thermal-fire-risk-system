@@ -38,7 +38,8 @@ const upstream = readArg('--upstream', 'http://127.0.0.1:11434/v1').replace(/\/$
 const checkOnly = hasFlag('--check-only')
 const shouldOpen = !hasFlag('--no-open')
 const ollamaPort = new URL(upstream).port || '11434'
-const isOllama = upstream.includes('11434') || upstream.includes('ollama')
+// 显式给了 --upstream 就说明用的是别的端点（LM Studio / 自建），不再去管 Ollama
+const isOllama = !args.includes('--upstream')
 const logFile = resolve('tools', 'local-ai.log')
 
 const wait = (ms) => new Promise((done) => setTimeout(done, ms))
