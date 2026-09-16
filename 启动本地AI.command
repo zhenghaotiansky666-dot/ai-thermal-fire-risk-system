@@ -20,16 +20,16 @@ fi
 
 echo "· Node 版本：$(node -v)"
 
-if [ ! -d node_modules ]; then
-  echo "· 首次运行，正在安装依赖（这一步只做一次，需要联网）…"
-  if command -v pnpm >/dev/null 2>&1; then
-    pnpm install || npm install
-  else
-    npm install
+# 运行包自带 dist，正常情况下不需要装依赖 / 构建
+if [ ! -f dist/index.html ]; then
+  if [ ! -d node_modules ]; then
+    echo "· 没有预构建的站点，正在安装依赖（只做一次，需要联网）…"
+    if command -v pnpm >/dev/null 2>&1; then
+      pnpm install || npm install
+    else
+      npm install
+    fi
   fi
-fi
-
-if [ ! -d dist ]; then
   echo "· 正在构建站点…"
   (command -v pnpm >/dev/null 2>&1 && pnpm build) || npm run build
 fi

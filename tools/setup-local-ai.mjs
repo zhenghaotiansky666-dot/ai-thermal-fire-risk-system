@@ -19,6 +19,7 @@
 
 import { spawn } from 'node:child_process'
 import { access, mkdir, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { resolve } from 'node:path'
@@ -176,6 +177,10 @@ async function ensureModel() {
 }
 
 async function ensureSite() {
+  // 运行包里自带 dist（预构建好的站点），所以正常情况不需要 npm install / build
+  if (!existsSync(resolve('dist', 'index.html'))) {
+    console.log('⚠️ 没找到预构建的 dist/index.html。若是源码包，请先执行：npm install && npm run build')
+  }
   if (await reachable(`http://127.0.0.1:${sitePort}/`)) {
     console.log(`· 本地站点已在运行（端口 ${sitePort}）`)
     return

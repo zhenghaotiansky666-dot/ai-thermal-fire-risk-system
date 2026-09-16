@@ -37,15 +37,18 @@ if errorlevel 1 (
 
 for /f "delims=" %%i in ('node -v') do echo · Node 版本：%%i
 
+rem 运行包自带 dist，正常情况下不需要装依赖 / 构建
+if exist dist\index.html goto run
+
 if not exist node_modules (
-  echo · 首次运行，正在安装依赖（只做一次，需要联网）…
+  echo · 没有预构建的站点，正在安装依赖（只做一次，需要联网）…
   call npm install
 )
 
-if not exist dist (
-  echo · 正在构建站点…
-  call npm run build
-)
+echo · 正在构建站点…
+call npm run build
+
+:run
 
 echo.
 node tools\setup-local-ai.mjs
