@@ -68,6 +68,11 @@ const outDir = resolve(readArg('--out', 'output/hardware'))
 const alwaysYes = hasFlag('--always-yes')
 const keepFrames = Number(readArg('--keep', '20'))
 const printFirmware = hasFlag('--print-firmware')
+// 确认火情后把事件广播出去，让「现场警报喇叭页」和用户端一起反应
+const publishUrl = readArg('--publish-url', process.env.TG_PUBLISH_URL || 'http://127.0.0.1:4173/sync/publish')
+const publishChannel = readArg('--publish-channel', process.env.TG_PUBLISH_CHANNEL || '')
+const nodeId = readArg('--node', process.env.TG_NODE_ID || 'C4')
+const nodeFloor = Number(readArg('--floor', process.env.TG_NODE_FLOOR || '4'))
 // 现场"路过的人也能知道"：确认火灾后用这台电脑的扬声器播报（零安装、不需要网络）
 const speak = !hasFlag('--no-speak')
 const speakRepeatSec = Number(readArg('--speak-repeat', '20'))
@@ -90,6 +95,55 @@ export function buildAlertPhrase({ maxTemp, smoke, repeat = false } = {}) {
   const where = Number.isFinite(Number(maxTemp)) ? `最高温度 ${Math.round(maxTemp)} 度` : '检测到异常热源'
   if (repeat) return `这里仍然有火情，${where}，请尽快离开。`
   return `注意，这里发生火灾，${where}，请立即沿安全出口撤离，不要乘坐电梯。`
+}
+
+// 硬件火情事件（结构与系统端一致，两端与喇叭页都能直接消费）
+export function buildHardwareFireEvent({ nodeId: id = 'C4', floor = 4, maxTemp, smoke, at = Date.now(), source = '硬件节点' } = {}) {
+  // 注意 null 会被 Number() 变成 0，必须显式排除，否则会报"最高温度 0 度"
+  const numeric = (value) => (value === null || value === undefined || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null))
+  const temp = numeric(maxTemp)
+  const smokeValue = numeric(smoke)
+  return {
+    v: 1,
+    id: `fire-hw-${at.toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    kind: 'fire',
+    at,
+    ttl: 30 * 60 * 1000,
+    from: 'hardware',
+    payload: {
+      nodeId: id,
+      floor: Number(floor) || null,
+      startedAt: at,
+      mode: 'live',
+      maxTemp: temp,
+      smoke: smokeValue,
+      notice: `${source}确认火情${temp ? `，最高温度 ${Math.round(temp)} 度` : ''}，请立即沿安全出口撤离`,
+    },
+  }
+}
+
+async function publishFireEvent({ maxTemp, smoke }) {
+  const event = buildHardwareFireEvent({ nodeId, floor: nodeFloor, maxTemp, smoke })
+  const tasks = []
+  if (publishUrl) {
+    tasks.push(fetch(publishUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    }).then((response) => response.ok).catch(() => false))
+  }
+  if (publishChannel) {
+    const topic = publishChannel.startsWith('ntfy:') ? publishChannel.slice(5) : publishChannel
+    tasks.push(fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    }).then((response) => response.ok).catch(() => false))
+  }
+  const results = await Promise.all(tasks)
+  const ok = results.some(Boolean)
+  console.log(`[publish] 硬件火情事件广播：${ok ? '成功' : '失败'}（${ok ? '' : '检查 --publish-url / --publish-channel'}）`)
+  return ok
 }
 
 const store = {
@@ -473,6 +527,8 @@ const server = createServer(async (request, response) => {
       if (decision.answer === 'YES') {
         speakAlert({ maxTemp: latestThermal?.maxTemp, smoke: null })
         pushLog({ at: Date.now(), answer: 'SPEAK', source: 'alert-speak', reason: buildAlertPhrase({ maxTemp: latestThermal?.maxTemp, repeat: spokenCount > 1 }) })
+        // 广播给「现场警报喇叭页」和用户端：楼道里的旧手机也会响
+        await publishFireEvent({ maxTemp: latestThermal?.maxTemp, smoke: null })
       }
       // 固件用 HTTPClient.getString() 和 "YES" 做字符串比较，所以这里必须返回恰好这两个字母
       text(response, 200, decision.answer)
@@ -600,6 +656,9 @@ function printBanner() {
   console.log(`  观察页面：  http://127.0.0.1:${activePort}/`)
   console.log(`  终审策略：  ${visionUrl ? `YOLO 视觉服务 ${visionUrl}（阈值 ${visionConf}）` : `热像阈值 ${yesTemp}°C`}${alwaysYes ? ' · 强制 YES（演示）' : ''}`)
   console.log(`  落盘目录：  ${outDir}`)
+  console.log(`  现场播报：  ${speak ? `开启（每 ${speakRepeatSec} 秒重复，可用 --no-speak 关闭）` : '已关闭'}`)
+  console.log(`  事件广播：  ${publishUrl || '未配置'}${publishChannel ? ` + 云端 ${publishChannel}` : ''}（确认火情后通知喇叭页与用户端）`)
+  console.log(`  喇叭页：    http://127.0.0.1:${activePort}/alarm-speaker.html 或站点 http://127.0.0.1:4173/alarm-speaker.html`)
   if (activePort !== port) {
     console.log('')
     console.log(`⚠️ 实际端口是 ${activePort}（不是 ${port}）：固件里 serverUrl / thermalServerUrl 的端口要一并改成 ${activePort}`)

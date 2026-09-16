@@ -2,6 +2,7 @@
 
 import {
   buildAlertPhrase,
+  buildHardwareFireEvent,
   decideFire,
   encodePng,
   extractImage,
@@ -113,6 +114,21 @@ console.log('[6] 现场语音播报（路过的人也能知道）')
   check('首次一定播报', shouldSpeak(1000, 0, 20000) === true)
   check('间隔内不重复播报', shouldSpeak(11000, 1000, 20000) === false)
   check('超过间隔再次播报', shouldSpeak(25000, 1000, 20000) === true)
+}
+
+console.log('[7] 硬件火情事件（广播给喇叭页与用户端）')
+{
+  const event = buildHardwareFireEvent({ nodeId: 'C4', floor: 4, maxTemp: 86.4, smoke: 2100, at: 1700000000000 })
+  check('事件类型为 fire（用户端会进入火警态）', event.kind === 'fire')
+  check('带 nodeId 与楼层（用户端据此定位）', event.payload.nodeId === 'C4' && event.payload.floor === 4)
+  check('带上温度与烟雾值', event.payload.maxTemp === 86.4 && event.payload.smoke === 2100)
+  check('通知文案含撤离指引', event.payload.notice.includes('撤离') && event.payload.notice.includes('86'))
+  check('标记来源为硬件', event.from === 'hardware')
+  check('事件有唯一 id 与 TTL', Boolean(event.id) && event.ttl > 0)
+
+  const noTemp = buildHardwareFireEvent({ maxTemp: null })
+  check('没有温度时不写 NaN', !String(noTemp.payload.notice).includes('NaN') && noTemp.payload.maxTemp === null)
+  check('默认节点可用', noTemp.payload.nodeId === 'C4' && noTemp.payload.floor === 4)
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

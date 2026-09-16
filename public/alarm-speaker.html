@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>现场警报喇叭 · 热感哨兵</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:#04101f; color:#f3f8ff; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; text-align:center; padding:24px; }
+    body.alarming { background:#c1121f; animation:flash .9s infinite alternate; }
+    @keyframes flash { from { background:#c1121f; } to { background:#7f1d1d; } }
+    main { width:min(760px,100%); display:flex; flex-direction:column; gap:18px; align-items:center; }
+    .status { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); font-size:14px; }
+    .dot { width:9px; height:9px; border-radius:50%; background:#94a3b8; }
+    .dot.live { background:#22c55e; box-shadow:0 0 10px #22c55e; }
+    .dot.bad { background:#ef4444; }
+    h1 { font-size:clamp(28px,6vw,54px); margin:0; line-height:1.15; letter-spacing:-.02em; }
+    .sub { font-size:clamp(14px,2.4vw,20px); color:rgba(255,255,255,.78); line-height:1.7; margin:0; }
+    .big { font-size:clamp(20px,4vw,34px); font-weight:700; }
+    button { min-height:56px; padding:0 26px; border-radius:16px; border:none; font-size:17px; font-weight:700;
+      background:linear-gradient(110deg,#2563eb,#38bdf8); color:#fff; cursor:pointer; }
+    button.ghost { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); font-weight:600; }
+    button:disabled { opacity:.5; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    .meta { color:rgba(255,255,255,.6); font-size:12px; line-height:1.7; }
+    code { color:#9ad6ff; }
+    .log { width:100%; max-height:180px; overflow:auto; text-align:left; font-size:12px; color:rgba(255,255,255,.72);
+      border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:10px 12px; background:rgba(0,0,0,.25); }
+  </style>
+</head>
+<body>
+<main>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">未开始值守</span></div>
+  <h1 id="headline">现场警报喇叭</h1>
+  <p class="sub" id="detail">
+    把一台旧手机/平板插上音箱放在楼道口，打开本页并点「开始值守」；<br />
+    系统端或硬件节点确认火情时，这里会<b>全屏变红 + 播报起火位置</b>，路过的人都能知道。
+  </p>
+  <div class="big" id="location"></div>
+  <div class="row">
+    <button id="start">开始值守</button>
+    <button class="ghost" id="test">试听播报</button>
+    <button class="ghost" id="stop">停止</button>
+  </div>
+  <p class="meta" id="linkInfo"></p>
+  <div class="log" id="log"></div>
+</main>
+
+<script>
+  // 现场警报喇叭：不装 App、不改硬件。
+  // 数据来源与系统端一致：① 同源局域网中继 /sync（现场热点）② 云端通道 ntfy:主题（跨网络）
+  const params = new URLSearchParams(location.search)
+  const channel = params.get('ch') || ''
+  const relayBase = (params.get('relay') || '').replace(/\/$/, '')
+  const label = params.get('name') || '本楼'
+
+  const dot = document.getElementById('dot')
+  const statusText = document.getElementById('statusText')
+  const headline = document.getElementById('headline')
+  const detail = document.getElementById('detail')
+  const locationText = document.getElementById('location')
+  const logBox = document.getElementById('log')
+  const linkInfo = document.getElementById('linkInfo')
+
+  let running = false
+  let cursor = ''
+  let seq = 0
+  let timer = null
+  let speakTimer = null
+  let currentNotice = ''
+
+  function log(line) {
+    const time = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    logBox.textContent = `${time}  ${line}\n` + logBox.textContent.slice(0, 1500)
+  }
+
+  // ---------------------------------------------------------------- 声音
+  let audioCtx = null
+  let siren = null
+  function startSiren() {
+    if (siren) return
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      audioCtx = audioCtx || new Ctx()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      const lfo = audioCtx.createOscillator()
+      const lfoGain = audioCtx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.value = 720
+      lfo.type = 'sine'
+      lfo.frequency.value = 1.6
+      lfoGain.gain.value = 140
+      gain.gain.value = 0.0001
+      lfo.connect(lfoGain)
+      lfoGain.connect(osc.frequency)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start()
+      lfo.start()
+      gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.2)
+      siren = { osc, lfo, gain, lfoGain }
+    } catch (error) {
+      log(`警笛启动失败：${error.message}（浏览器要求先点一次页面）`)
+    }
+  }
+  function stopSiren() {
+    if (!siren) return
+    try {
+      siren.gain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2)
+      setTimeout(() => {
+        try { siren.osc.stop(); siren.lfo.stop() } catch {}
+        siren = null
+      }, 250)
+    } catch {
+      siren = null
+    }
+  }
+  function speak(text) {
+    try {
+      if (!('speechSynthesis' in window)) return
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'zh-CN'
+      utterance.rate = 1
+      utterance.volume = 1
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(utterance)
+    } catch {}
+  }
+
+  // ---------------------------------------------------------------- 告警状态
+  function alarmOn(notice) {
+    currentNotice = notice
+    document.body.classList.add('alarming')
+    headline.textContent = '火警 · 立即撤离'
+    locationText.textContent = notice
+    detail.innerHTML = '请沿最近的安全出口撤离，不要乘坐电梯，不要返回取物。'
+    startSiren()
+    speak(`${label}发生火灾。${notice}。请立即沿安全出口撤离，不要乘坐电梯。`)
+    if (speakTimer) clearInterval(speakTimer)
+    speakTimer = setInterval(() => {
+      if (currentNotice) speak(`火情仍在持续。${currentNotice}。请尽快撤离。`)
+    }, 15000)
+    log(`进入火警状态：${notice}`)
+  }
+  function alarmOff(reason = '警报解除') {
+    currentNotice = ''
+    document.body.classList.remove('alarming')
+    headline.textContent = '现场警报喇叭'
+    locationText.textContent = ''
+    detail.textContent = reason + '。保持值守中，有火警会自动播报。'
+    stopSiren()
+    if (speakTimer) clearInterval(speakTimer)
+    speakTimer = null
+    try { window.speechSynthesis?.cancel() } catch {}
+    log(reason)
+  }
+
+  function describeEvent(event) {
+    const payload = event?.payload || {}
+    const floor = payload.floor ?? (payload.nodeId ? String(payload.nodeId).replace(/\D/g, '') : '')
+    const place = `${label}${floor ? `${floor} 楼` : ''}`
+    const extra = payload.notice || payload.text || ''
+    if (extra) return `${place}：${extra}`
+    const temp = payload.maxTemp ? `最高温度 ${Math.round(payload.maxTemp)} 度` : ''
+    return `${place}检测到火情${temp ? `，${temp}` : ''}`
+  }
+
+  // ---------------------------------------------------------------- 取数
+  async function poll() {
+    if (!running) return
+    try {
+      if (channel.startsWith('ntfy:') || /^[A-Za-z0-9_-]{3,64}$/.test(channel)) {
+        const topic = channel.startsWith('ntfy:') ? channel.slice(5) : channel
+        const url = `https://ntfy.sh/${topic}/json?poll=1&since=${encodeURIComponent(cursor || '15m')}`
+        const response = await fetch(url, { cache: 'no-store' })
+        if (!response.ok) { mark('bad', '云端通道响应异常，重试中'); return }
+        const text = await response.text()
+        text.split('\n').filter(Boolean).forEach((line) => {
+          let record = null
+          try { record = JSON.parse(line) } catch { return }
+          if (record?.id) cursor = String(record.id)
+          if (record?.event !== 'message') return
+          let event = null
+          try { event = JSON.parse(record.message) } catch { return }
+          handleEvent(event)
+        })
+        mark('live', `值守中 · 云端通道 ${topic}`)
+        return
+      }
+      const base = relayBase || ''
+      const response = await fetch(`${base}/sync/events?since=${seq}&wait=15000`, { cache: 'no-store' })
+      if (!response.ok) { mark('bad', '局域网中继不可用，重试中'); return }
+      const data = await response.json()
+      if (Number.isFinite(Number(data?.seq))) seq = Number(data.seq)
+      ;(data?.events || []).forEach(handleEvent)
+      mark('live', `值守中 · 局域网中继（在线设备 ${data?.clients ?? '—'}）`)
+    } catch (error) {
+      mark('bad', `连接中断：${String(error?.message || error).slice(0, 40)}`)
+    }
+  }
+
+  function handleEvent(event) {
+    if (!event?.kind) return
+    if (event.kind === 'fire') alarmOn(describeEvent(event))
+    else if (event.kind === 'clear') alarmOff('系统端已解除警报')
+    else if (event.kind === 'notice' && event.payload?.text) {
+      // 通知类事件：只播报一次，不进入持续警报
+      const text = `${label}通知：${event.payload.text}`
+      locationText.textContent = text
+      speak(text)
+      log(`收到通知：${event.payload.text}`)
+    }
+  }
+
+  function mark(state, text) {
+    dot.className = `dot ${state}`
+    statusText.textContent = text
+  }
+
+  async function loop() {
+    await poll()
+    if (running) timer = setTimeout(loop, 300)
+  }
+
+  document.getElementById('start').addEventListener('click', () => {
+    if (running) return
+    running = true
+    document.getElementById('start').disabled = true
+    mark('live', '正在连接…')
+    // 用户手势里预热音频与语音，避免浏览器自动播放限制
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      audioCtx = audioCtx || new Ctx()
+      audioCtx.resume?.()
+    } catch {}
+    speak('现场警报喇叭已开始值守')
+    log('开始值守')
+    loop()
+  })
+
+  document.getElementById('stop').addEventListener('click', () => {
+    running = false
+    if (timer) clearTimeout(timer)
+    document.getElementById('start').disabled = false
+    alarmOff('已停止值守')
+    mark('', '未开始值守')
+  })
+
+  document.getElementById('test').addEventListener('click', () => {
+    alarmOn(`${label}演练：本次为试听，不是真实火警`)
+    setTimeout(() => alarmOff('试听结束'), 5000)
+  })
+
+  linkInfo.innerHTML = channel
+    ? `数据来源：云端通道 <code>${channel}</code>（跨网络可用，需要互联网）`
+    : `数据来源：当前站点的局域网中继 <code>/sync</code>（现场热点即可，不需要互联网）`
+</script>
+</body>
+</html>
