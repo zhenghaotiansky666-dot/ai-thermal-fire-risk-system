@@ -24,6 +24,8 @@ const FILES = [
 const DIRS = [
   ['tools', 'tools'],
   ['dist', 'dist'],
+  // 硬件队友要改的固件文件（只动了地址/端口/注释，引脚没动）
+  ['firmware', 'firmware'],
 ]
 
 const README = `热感哨兵 · 队友运行包（${stamp}）
@@ -38,6 +40,14 @@ const README = `热感哨兵 · 队友运行包（${stamp}）
 【第二步】把打印出来的地址发给手机/另一台电脑（同一个 Wi-Fi 即可）：
     系统端  http://<本机IP>:4173/mobile-app.html
     用户端  http://<本机IP>:4173/user-app.html
+
+【硬件队友要看的】firmware/ 目录里是改好的 ESP32-S3 固件文件：
+    改动说明.md  改哪两行、为什么、怎么烧录（先看这个）
+    main.cpp     改好的源码（只动了 serverUrl / thermalServerUrl 的地址与端口）
+    changes.diff 逐行对照
+    端口默认 8787：这样 macOS 演示机不用动被「隔空播放」占用的 5000 端口。
+    最省事的做法：在演示电脑上跑  node tools/hardware-receiver.mjs --port 8787 --print-firmware
+    它会把这两行连当前局域网 IP 一起打印出来，直接粘贴替换即可。
 
 【第三步】接 YOLO（视觉通道）
     注意：python 命令必须在【命令提示符(cmd)或 PowerShell】里敲，

@@ -1,0 +1,42 @@
+--- Fire Dector/src/main.cpp（队友原版）
++++ main.cpp（改好的版本）
+@@ -1,3 +1,15 @@
++// ============================================================================
++// 热感哨兵 · 硬件固件（Web/系统端同事已代为修正 3 处，请核对后烧录）
++//
++// 改动 1（必须）：thermalServerUrl 原来是 "http://10.240.250"，少了端口与路径，
++//                 热像数据发不出去 —— 已补全为 http://<电脑IP>:8787/upload_thermal
++// 改动 2（必须）：serverUrl 的端口与路径已统一为 /upload（请把 IP 换成演示电脑的局域网 IP）
++// 改动 3（提示）：两处引脚冲突（GPIO 2 / GPIO 4 被相机数据脚与 I2C/烟雾共用），
++//                 已在对应位置标 TODO，请按实际接线确认（我无法验证你们的板子）
++//
++// 提示：在电脑上运行 `node tools/hardware-receiver.mjs --port 8787 --print-firmware`
++//       会自动打印出"带当前电脑局域网 IP"的这两行，直接粘贴替换最省事。
++// ============================================================================
+ #include <Arduino.h>
+ #include <WiFi.h>
+ #include <HTTPClient.h>
+@@ -10,17 +22,18 @@
+ #include <ArduinoJson.h>
+ // ==================== 1. 硬件引脚与参数配置 ====================
+ #define I2C_SDA       1         // MLX90640 数据引脚
+-#define I2C_SCL       2         // MLX90640 时钟引脚
++#define I2C_SCL       2         // TODO(引脚冲突)：GPIO 2 同时被相机数据脚 Y4_GPIO_NUM 使用，请确认实际接线
+ #define BUZZER_PIN    3         // DZQJ 有源蜂鸣器控制引脚
+-#define SMOKE_PIN     4         // DZQJ 烟雾传感器模拟引脚
++#define SMOKE_PIN     4         // TODO(引脚冲突)：GPIO 4 同时被相机数据脚 Y5_GPIO_NUM 使用，请确认实际接线
+ 
+ // Wi-Fi 账号密码（请修改为你现场的 Wi-Fi）
+-const char* ssid     = "你的WiFi名称";
++const char* ssid     = "你的WiFi名称";   // 必须填现场 Wi-Fi（ESP32 仅支持 2.4G，手机热点也可）
+ const char* password = "你的WiFi密码";
+ 
+ // Windows 电脑本地 AI 接收端地址（请修改为你电脑的实际 IP）
+-const char* serverUrl = "http://10.240.250.12:5000/upload"; // 电脑端 Flask 接口地址
+-const char* thermalServerUrl = "http://10.240.250";
++// TODO(部署时替换 IP)：用 node tools/hardware-receiver.mjs --print-firmware 打印这一行
++const char* serverUrl        = "http://192.168.1.100:8787/upload";         // 可见光照片接收地址
++const char* thermalServerUrl = "http://192.168.1.100:8787/upload_thermal"; // 原值少了端口与路径，已补全
+ 
+ // 蓝牙广播专属 UUID（保持默认，方便 AI 端扫描过滤）
+ #define SERVICE_UUID "7c2b8e7a-6f4d-4a9a-9b1f-2d3e4f5a6b7c"
