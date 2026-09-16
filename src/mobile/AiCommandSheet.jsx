@@ -11,6 +11,8 @@ import { Cpu, RefreshCw, Save, Server, Stethoscope, TriangleAlert, X } from 'luc
 import { aiReachable, listAiProviders, providerPreset, readAiSettings, saveAiSettings } from '../shared/aiClient.js'
 import { integrationStatus, subscribeIntegrations } from '../shared/aiHooks.js'
 import { buildAiPairUrl } from '../shared/aiPairing.js'
+import { probeVision } from '../shared/visionClient.js'
+import { installVisionBridgeFromSettings } from '../shared/aiClient.js'
 
 export default function AiCommandSheet({ onClose, onSaved }) {
   const [form, setForm] = useState(() => readAiSettings())
@@ -21,6 +23,7 @@ export default function AiCommandSheet({ onClose, onSaved }) {
   const [diagnosing, setDiagnosing] = useState(false)
   const [pairQr, setPairQr] = useState('')
   const [pairUrl, setPairUrl] = useState('')
+  const [visionProbe, setVisionProbe] = useState('')
 
   // 队友在控制台里注册能力后，这个面板会立刻反映"已接入"
   useEffect(() => subscribeIntegrations(() => setStatus(integrationStatus())), [])
@@ -36,9 +39,17 @@ export default function AiCommandSheet({ onClose, onSaved }) {
 
   const persist = () => {
     const next = saveAiSettings(form)
+    // 保存后立刻让「视觉通道」生效（阶段一的火焰/烟雾改由 YOLO 提供）
+    installVisionBridgeFromSettings()
     setSaved('已保存到本机，用户端会自动使用同一份设置')
     onSaved?.(next)
     window.setTimeout(() => setSaved(''), 3200)
+  }
+
+  const testVision = async () => {
+    setVisionProbe('testing')
+    const result = await probeVision(form)
+    setVisionProbe(result.ok ? `ok:${result.model || '视觉服务'}` : `fail:${result.reason}`)
   }
 
   // 一键诊断：让本地服务器替页面去探模型端口（浏览器自己探不了 127.0.0.1 之外的内网地址）
@@ -160,6 +171,48 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           />
           该模型支持读图（视觉模型，用于复核用户上传的疏散路线图）
         </label>
+
+        <div className="ai-sheet-section">
+          <strong>视觉通道（YOLO 火焰 / 烟雾检测）</strong>
+          <label className="ai-sheet-field">
+            服务地址（YOLO 独立服务，不是对话模型）
+            <input
+              type="text"
+              placeholder="http://192.168.1.20:8000"
+              value={form.visionUrl || ''}
+              onChange={(event) => patch({ visionUrl: event.target.value })}
+            />
+          </label>
+          <div className="ai-vision-row">
+            <label className="ai-sheet-field">
+              权重名
+              <input type="text" placeholder="yolov8n.pt" value={form.visionModel || ''} onChange={(event) => patch({ visionModel: event.target.value })} />
+            </label>
+            <label className="ai-sheet-field">
+              置信度阈值
+              <input
+                type="number"
+                min="0.05"
+                max="0.95"
+                step="0.05"
+                value={form.visionConf ?? 0.25}
+                onChange={(event) => patch({ visionConf: Number(event.target.value) })}
+              />
+            </label>
+          </div>
+          <div className="ai-sheet-actions">
+            <button type="button" onClick={testVision} disabled={visionProbe === 'testing' || !form.visionUrl}>
+              <Stethoscope size={15} /> {visionProbe === 'testing' ? '正在测试…' : '测试视觉通道'}
+            </button>
+            <span className={`ai-probe ${visionProbe.startsWith('ok') ? 'is-ok' : visionProbe.startsWith('fail') ? 'is-fail' : ''}`}>
+              {visionProbe.startsWith('ok') ? `视觉服务可用（${visionProbe.slice(3)}）` : visionProbe.startsWith('fail') ? `不可用：${visionProbe.slice(5)}` : '未测试'}
+            </span>
+          </div>
+          <p className="ai-sheet-hint">
+            跑 YOLO：<code>cd tools/yolo-service &amp;&amp; python app.py --host 0.0.0.0 --port 8000</code>。
+            填好后阶段一的「火焰 / 烟雾」就来自 YOLO，热像仍由节点提供，三路证据融合自动生效。
+          </p>
+        </div>
 
         <div className="ai-sheet-actions">
           <button type="button" className="sheet-save" onClick={persist}><Save size={16} />保存设置</button>

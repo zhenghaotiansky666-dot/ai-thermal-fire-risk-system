@@ -19,6 +19,23 @@ const registry = {
   vitalSensor: null,
 }
 
+// 内置的 YOLO 视觉通道桥：只要设置了 visionUrl，就自动把检测服务接进视觉通道，
+// 不需要队友改任何代码（阶段一的三路证据融合会直接用它的火焰/烟雾置信度）
+let visionBridge = null
+
+export function installVisionBridge(detector) {
+  if (!isFunction(detector)) return false
+  visionBridge = detector
+  // 不覆盖团队手动注册的视觉通道
+  if (!registry.visionDetector) registry.visionDetector = detector
+  notify('vision-bridge')
+  return true
+}
+
+export function getVisionBridge() {
+  return visionBridge
+}
+
 const listeners = new Set()
 
 function notify(reason) {

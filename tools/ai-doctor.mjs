@@ -16,6 +16,9 @@ import { networkInterfaces } from 'node:os'
 
 export const DEFAULT_MODEL = 'qwen2.5:7b'
 
+// 1×1 透明 PNG：用来给视觉服务做"连通性探测"（不会真的检出目标）
+export const TINY_PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
 export function lanAddresses() {
   const out = []
   const interfaces = networkInterfaces()
@@ -78,6 +81,21 @@ export function classifyChat({ ok, status, content, error }) {
   return { level: 'fail', title: `对话请求失败${error ? `（${error}）` : status ? `（HTTP ${status}）` : ''}`, remedy: '看模型服务控制台的报错；显存不足时换更小的模型（如 qwen2.5:3b）' }
 }
 
+// 服务类型判定：对话模型（Ollama/LM Studio）还是视觉检测（YOLO）？
+// 这一步很重要：把 YOLO 的地址填进「AI 指挥」是最容易犯的错，这里要能直接点出来。
+export function classifyServiceShape({ modelsOk, modelsStatus, healthOk, detectOk, visionConfigured = false }) {
+  if (modelsOk) return { kind: 'chat', level: 'pass', title: '识别为对话模型服务（OpenAI 兼容）', remedy: '' }
+  if (healthOk && (detectOk || visionConfigured || modelsStatus === 404)) {
+    return {
+      kind: 'vision',
+      level: 'warn',
+      title: '识别为视觉检测服务（YOLO），不是对话模型',
+      remedy: '把它的地址填到「视觉通道（YOLO）」，不要填在「AI 指挥」的端点里；指挥决策仍需要另一个对话模型（Ollama / LM Studio / 自建 LLM）',
+    }
+  }
+  return { kind: 'unknown', level: 'fail', title: '既不是对话模型，也不像视觉服务', remedy: '确认服务已启动、端口正确，且用 --host 0.0.0.0 监听' }
+}
+
 export function summarize(checks) {
   const fails = checks.filter((item) => item.level === 'fail')
   const warns = checks.filter((item) => item.level === 'warn')
@@ -114,6 +132,7 @@ async function fetchJson(url, options = {}, timeoutMs = 6000) {
 
 export async function runDoctor(options = {}) {
   const upstream = String(options.upstream ?? 'http://127.0.0.1:11434/v1').replace(/\/$/, '')
+  const root = upstream.replace(/\/v1$/, '')
   const model = options.model ?? DEFAULT_MODEL
   const siteBase = String(options.siteBase ?? 'http://127.0.0.1:4173').replace(/\/$/, '')
   const origin = options.origin ?? 'https://zhenghaotiansky666-dot.github.io'
@@ -125,14 +144,54 @@ export async function runDoctor(options = {}) {
 
   // 1) 本机端口
   const local = await fetchJson(`${upstream}/models`)
-  push('local-port', '本机模型端口', classifyPortCheck({ ok: local.ok, status: local.status, error: local.error, label: '本机模型' }), upstream)
+  let serviceKind = 'chat'
+  let shape = null
+  if (!local.ok) {
+    // 先判断它到底是什么服务，再决定给什么建议，避免把 YOLO 服务按"对话模型"来教
+    const visionHealth = await fetchJson(`${root}/health`, {}, 3000)
+    let visionDetect = { ok: false }
+    if (visionHealth.ok) {
+      visionDetect = await fetchJson(`${root}/detect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: TINY_PNG_DATA_URL, conf: 0.25 }),
+      }, 8000)
+    }
+    shape = classifyServiceShape({
+      modelsOk: false,
+      modelsStatus: local.status,
+      healthOk: visionHealth.ok,
+      detectOk: visionDetect.ok,
+      visionConfigured: Boolean(options.visionUrl),
+    })
+    serviceKind = shape.kind
+  }
+
+  if (serviceKind === 'vision') {
+    push('local-port', '这个地址是视觉检测服务（YOLO）', {
+      level: 'warn',
+      title: '视觉服务在跑，但它不接对话接口',
+      remedy: 'YOLO 请填到「AI 指挥 → 视觉通道（YOLO）」；指挥决策另配一个对话模型（Ollama / LM Studio / 自建 LLM）',
+    }, upstream)
+  } else {
+    push('local-port', '本机模型端口', classifyPortCheck({ ok: local.ok, status: local.status, error: local.error, label: '本机模型' }), upstream)
+  }
+  if (shape) push('service-kind', '服务类型识别', shape, root)
 
   // 2) 局域网端口（队友要从另一台电脑连）
   const lan = lanAddresses()[0]
   if (lan) {
     const lanUrl = upstream.replace('127.0.0.1', lan)
     const lanResult = await fetchJson(`${lanUrl}/models`)
-    push('lan-port', '局域网访问', classifyPortCheck({ ok: lanResult.ok, status: lanResult.status, error: lanResult.error, label: `局域网 ${lan}` }), lanUrl)
+    if (serviceKind === 'vision' && !lanResult.ok) {
+      push('lan-port', '局域网访问', {
+        level: 'warn',
+        title: `视觉服务在局域网地址上没响应（${lan}）`,
+        remedy: '用 --host 0.0.0.0 启动 YOLO 服务（python app.py --host 0.0.0.0 --port 8000），并放行该端口',
+      }, lanUrl)
+    } else {
+      push('lan-port', '局域网访问', classifyPortCheck({ ok: lanResult.ok, status: lanResult.status, error: lanResult.error, label: `局域网 ${lan}` }), lanUrl)
+    }
   } else {
     push('lan-port', '局域网访问', { level: 'warn', title: '没有检测到局域网 IP（可能没连网）', remedy: '连上 Wi-Fi/网线后重跑本脚本' })
   }
@@ -146,10 +205,21 @@ export async function runDoctor(options = {}) {
   const tags = await fetchJson(tagsPath)
   const models = tags.json?.data ?? tags.json?.models ?? []
   const modelCheck = classifyModels(models.map((item) => item?.id ?? item?.name ?? item), model)
-  push('models', '模型是否就位', modelCheck, `期望 ${model}`)
+  // 如果是视觉服务，就不要拿"对话模型列表"去卡它，直接告诉用户填错地方了
+  if (serviceKind === 'vision') {
+    push('models', '对话模型是否就位', {
+      level: 'warn',
+      title: '跳过：这个地址是 YOLO 视觉服务',
+      remedy: '它负责火焰/烟雾检测，请填到「视觉通道（YOLO）」；指挥决策另配一个对话模型',
+    }, `期望 ${model}`)
+  } else {
+    push('models', '模型是否就位', modelCheck, `期望 ${model}`)
+  }
 
   // 5) 真正对话一次
-  if (modelCheck.matched) {
+  if (serviceKind === 'vision') {
+    push('chat', '实际对话测试', { level: 'warn', title: '跳过：视觉服务不接对话接口', remedy: '' })
+  } else if (modelCheck.matched) {
     const chat = await fetchJson(`${upstream}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -179,6 +249,7 @@ export async function runDoctor(options = {}) {
   const summary = summarize(checks)
   return {
     ok: summary.ok,
+    serviceKind,
     summary,
     checks,
     hints: {

@@ -1586,6 +1586,7 @@ export default function MobileApp() {
           thresholds={{ high: settings.highThreshold, medium: settings.mediumThreshold }}
           history={frameHistory}
           floor={position.floor}
+          image={image}
           onAlarm={() => pushAlarm({ mode: 'auto', startedAt: Date.now(), temp: result.maxTemp, hotspots: result.hotspots?.length ?? 0, location: `AI 预防判定 · ${position.floor} 楼`, sourceLabel: 'AI 判定' })}
           onNotify={async (notice) => {
             const ok = await copyNotice(notice)

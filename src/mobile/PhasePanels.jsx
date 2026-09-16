@@ -28,7 +28,7 @@ import { readUserStatuses } from '../user/binaryDialogue.js'
 import { temperatureColor } from './thermal.js'
 
 // ---------------------------------------------------------------- 阶段一：预防判定
-export function PreventionPanel({ result, thresholds, history = [], floor = 4, onAlarm, onNotify }) {
+export function PreventionPanel({ result, thresholds, history = [], floor = 4, onAlarm, onNotify, image = '' }) {
   const [visionFlame, setVisionFlame] = useState(0)
   const [visionSmoke, setVisionSmoke] = useState(0)
   const [visionChannel, setVisionChannel] = useState(() => ({ attached: Boolean(getVisionDetector()), note: '' }))
@@ -41,7 +41,7 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
     if (!getVisionDetector()) return undefined
     let cancelled = false
     const run = async () => {
-      const outcome = await runVisionDetector({ frame: result, floor })
+      const outcome = await runVisionDetector({ frame: result, floor, image })
       if (cancelled) return
       if (outcome.flame !== null) setVisionFlame(outcome.flame)
       if (outcome.smoke !== null) setVisionSmoke(outcome.smoke)
@@ -54,7 +54,7 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
       window.clearInterval(timer)
     }
     // 队友可能在页面运行中途才注册视觉通道：attached 变化时重新拉起轮询
-  }, [result?.maxTemp, result?.timestamp, floor, visionChannel.attached])
+  }, [result?.maxTemp, result?.timestamp, floor, visionChannel.attached, image])
 
   // 温升速率用最近一段历史估计（有真实设备时由采样帧提供）
   const ror = useMemo(() => {

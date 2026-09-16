@@ -14,6 +14,7 @@ import { describeVitalSigns } from './vitalSigns.js'
 import {
   getVitalSensor,
   getVisionDetector,
+  installVisionBridge,
   integrationStatus,
   listExtraProviders,
   readVitalFrame,
@@ -24,6 +25,7 @@ import {
   subscribeIntegrations,
 } from './aiHooks.js'
 import { readCloudChannel, saveCloudChannel } from './eventBus.js'
+import { detectWithVision } from './visionClient.js'
 
 export const AI_SETTINGS_KEY = 'thermalGuardAiSettings'
 
@@ -84,6 +86,10 @@ export const DEFAULT_AI_SETTINGS = {
   // 该本地模型是否支持读图（qwen2.5-vl / llava / minicpm-v 等）。关掉时只发文字摘要，
   // 打开后会把缩小的路线图一并交给本地模型识别——两者都不出本机网络。
   vision: false,
+  // 视觉通道（YOLO 等检测服务）：与对话端点分开配置
+  visionUrl: '',
+  visionModel: '',
+  visionConf: 0.25,
 }
 
 function safeParse(raw) {
@@ -106,7 +112,7 @@ export function setExternalAiConfig(config) {
     return null
   }
   // 只取认识的字段，配置文件里的注释字段（_readme / _fields 等）不参与合并
-  const allowed = ['provider', 'baseUrl', 'model', 'apiKey', 'vision', 'timeoutMs', 'cloudChannel', 'areaChannels']
+  const allowed = ['provider', 'baseUrl', 'model', 'apiKey', 'vision', 'timeoutMs', 'cloudChannel', 'areaChannels', 'visionUrl', 'visionModel', 'visionConf']
   const next = {}
   allowed.forEach((key) => {
     if (config[key] !== undefined) next[key] = config[key]
@@ -175,7 +181,20 @@ export async function bootstrapAiConfig() {
     if (isDefault) saveAreaChannels(presetAreas)
   }
   installGlobalAiApi()
+  installVisionBridgeFromSettings()
   return readAiSettings()
+}
+
+// 只要配置了视觉服务地址，就把它接进「视觉通道」——队友只要填一个地址，阶段一就会用 YOLO 的结果
+export function installVisionBridgeFromSettings() {
+  const settings = readAiSettings()
+  if (!settings.visionUrl) return false
+  return installVisionBridge(async ({ image }) => {
+    if (!image) return { flame: null, smoke: null, note: '等待图像输入（视觉通道需要一张图片）' }
+    const result = await detectWithVision(image, readAiSettings())
+    if (!result.ok) return { flame: null, smoke: null, note: `视觉服务不可用（${result.reason}）` }
+    return { flame: result.flame, smoke: result.smoke, note: result.note }
+  })
 }
 
 // 队友的接入面板：控制台里执行 window.ThermalGuardAI.help() 会打印用法

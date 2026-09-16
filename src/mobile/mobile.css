@@ -2056,6 +2056,10 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
   color: #9ad6ff; border: 1px dashed rgba(56,189,248,.45); border-radius: 10px;
   background: rgba(14,165,233,.08); font-size: 9px; text-decoration: none;
 }
+.ai-sheet-section { display: flex; flex-direction: column; gap: 8px; padding: 11px 12px; border: 1px solid rgba(249,115,22,.32); border-radius: 12px; background: rgba(249,115,22,.08); }
+.ai-sheet-section > strong { color: #ffd7a8; font-size: 10px; }
+.ai-sheet-section code { color: #ffc98a; font-size: 8px; }
+.ai-vision-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ai-pair { padding: 11px 12px; border: 1px solid rgba(56,189,248,.32); border-radius: 12px; background: rgba(14,165,233,.1); display: flex; flex-direction: column; gap: 8px; }
 .ai-pair > strong { color: #dcecff; font-size: 10px; }
 .ai-pair img { display: block; width: 180px; height: 180px; margin: 0 auto; padding: 6px; border-radius: 12px; background: #fff; }
