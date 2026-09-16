@@ -35,6 +35,8 @@ const upstream = readArg('--upstream', 'http://127.0.0.1:11434/v1').replace(/\/$
 const dist = resolve(readArg('--dist', 'dist'))
 // 默认监听所有网卡：手机连现场热点后要能直接打开这个站点（断网也能用中继）
 const host = readArg('--host', '0.0.0.0')
+// 硬件接收端（ESP32-S3 上传可见光/热像）默认在 5000；macOS 被 AirPlay 占用时可用 --hardware-port 5011 等
+const hardwarePort = Number(readArg('--hardware-port', '5000'))
 
 function lanAddresses() {
   const result = []
@@ -123,6 +125,40 @@ async function proxyAi(request, response) {
       upstream,
       detail: String(error?.message ?? error),
       hint: '确认本地模型已经启动：ollama serve（默认 11434）或 LM Studio 的 Local Server（默认 1234）。',
+    }))
+  }
+}
+
+// 把硬件接收端挂到同源 /hw/* 下：
+// HTTPS 页面无法直接访问 http://<主机>:5000（混合内容），走同源代理就没这个问题。
+async function proxyHardware(request, response) {
+  const suffix = request.url.replace(/^\/hw/, '') || '/'
+  const target = `http://127.0.0.1:${hardwarePort}${suffix}`
+  const chunks = []
+  for await (const chunk of request) chunks.push(chunk)
+  try {
+    const upstreamResponse = await fetch(target, {
+      method: request.method,
+      headers: {
+        ...(request.headers['content-type'] ? { 'Content-Type': request.headers['content-type'] } : {}),
+        ...(request.headers.authorization ? { Authorization: request.headers.authorization } : {}),
+      },
+      body: request.method === 'GET' || request.method === 'HEAD' ? undefined : Buffer.concat(chunks),
+    })
+    const buffer = Buffer.from(await upstreamResponse.arrayBuffer())
+    response.writeHead(upstreamResponse.status, {
+      'Content-Type': upstreamResponse.headers.get('content-type') ?? 'application/octet-stream',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-store',
+    })
+    response.end(buffer)
+  } catch (error) {
+    response.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+    response.end(JSON.stringify({
+      ok: false,
+      error: 'hardware-receiver-unreachable',
+      hint: `没连上硬件接收端（127.0.0.1:${hardwarePort}）。请另开一个窗口运行：node tools/hardware-receiver.mjs --port ${hardwarePort}`,
+      detail: String(error?.message ?? error),
     }))
   }
 }
@@ -306,6 +342,10 @@ createServer(async (request, response) => {
     await proxyAi(request, response)
     return
   }
+  if (url.pathname === '/hw' || url.pathname.startsWith('/hw/')) {
+    await proxyHardware(request, response)
+    return
+  }
   await serveStatic(request, response, url.pathname)
 }).listen(port, host, () => {
   console.log(`热感哨兵本地站点：http://127.0.0.1:${port}/user-app.html （系统端 .../mobile-app.html）`)
@@ -314,6 +354,7 @@ createServer(async (request, response) => {
   })
   console.log(`本地大模型代理：/ai/*  →  ${upstream}`)
   console.log(`局域网事件中继：/sync/*  （手机连现场热点后打开 http://<本机局域网IP>:${port}/ 即可互通，不需要互联网）`)
+  console.log(`硬件接收端代理：/hw/*  →  http://127.0.0.1:${hardwarePort}（ESP32-S3 上传可见光/热像；另开窗口跑 tools/hardware-receiver.mjs）`)
   console.log(`扫码加入页（评委手机扫码进用户端）：http://127.0.0.1:${port}/join`)
   console.log('在页面「AI 指挥」里把端点填成 /ai/v1 即可，断网也能用。')
   console.log('')

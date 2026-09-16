@@ -38,6 +38,8 @@ let sitePort = requestedPort
 const upstream = readArg('--upstream', 'http://127.0.0.1:11434/v1').replace(/\/$/, '')
 const checkOnly = hasFlag('--check-only')
 const shouldOpen = !hasFlag('--no-open')
+const withHardware = !hasFlag('--no-hardware')
+const hardwarePort = Number(readArg('--hardware-port', '5000'))
 const ollamaPort = new URL(upstream).port || '11434'
 // 显式给了 --upstream 就说明用的是别的端点（LM Studio / 自建），不再去管 Ollama
 const isOllama = !args.includes('--upstream')
@@ -206,6 +208,32 @@ async function ensureSite() {
   console.log('⚠️ 站点没起来，请查看 tools/local-ai.log')
 }
 
+// 硬件接收端（ESP32-S3 上传可见光与热像）：默认一起拉起来，队友不用记第二条命令
+async function ensureHardwareReceiver() {
+  if (!withHardware) return
+  if (await reachable(`http://127.0.0.1:${hardwarePort}/health`)) {
+    console.log(`· 硬件接收端已在运行（端口 ${hardwarePort}）`)
+    return
+  }
+  const logHandle = await (await import('node:fs')).openSync?.(logFile, 'a')
+  const child = spawn(process.execPath, ['tools/hardware-receiver.mjs', '--port', String(hardwarePort)], {
+    detached: true,
+    stdio: ['ignore', logHandle ?? 'ignore', logHandle ?? 'ignore'],
+  })
+  child.unref()
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await wait(300)
+    // 端口被占时接收端会自动往后找，这里把 5000~5008 都探一遍
+    for (let candidate = hardwarePort; candidate <= hardwarePort + 8; candidate += 1) {
+      if (await reachable(`http://127.0.0.1:${candidate}/health`)) {
+        console.log(`· 硬件接收端已启动（端口 ${candidate}）：可见光 POST /upload，热像 POST /upload_thermal`)
+        return
+      }
+    }
+  }
+  console.log('⚠️ 硬件接收端没起来，请查看 tools/local-ai.log')
+}
+
 async function printQr(url) {
   try {
     const require = createRequire(import.meta.url)
@@ -231,6 +259,7 @@ export async function main() {
     const ollamaReady = await ensureOllama()
     if (ollamaReady) await ensureModel()
     await ensureSite()
+    await ensureHardwareReceiver()
   }
 
   console.log('\n== 自检 ==')
@@ -246,6 +275,12 @@ export async function main() {
   console.log('  推理来源：本地 Ollama（或自定义端点）')
   console.log('  端点地址：/ai/v1        ← 同源代理，不用填 IP，也不会被浏览器拦')
   console.log(`  模型名  ：${report.checks.find((item) => item.id === 'models')?.matched ?? model}`)
+  console.log('')
+  console.log('== 硬件（ESP32-S3）==')
+  console.log('  可见光上传：http://<本机IP>:5000/upload          ← 固件 serverUrl')
+  console.log('  热像上传：  http://<本机IP>:5000/upload_thermal   ← 固件 thermalServerUrl')
+  console.log('  观察页面：  http://127.0.0.1:5000/')
+  console.log('  没有硬件时可先用模拟器：node tools/hardware-sim.mjs --port 5000 --hot')
   console.log('')
   console.log('手机扫下面这个二维码即可打开系统端：')
   await printQr(lanUrl)

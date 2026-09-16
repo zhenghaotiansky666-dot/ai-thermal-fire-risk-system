@@ -63,6 +63,7 @@ import AlarmOverlay from './AlarmOverlay.jsx'
 import AiCommandSheet from './AiCommandSheet.jsx'
 import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdfReport } from './EmergencyPanels.jsx'
 import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from './PhasePanels.jsx'
+import HardwareFeed from './HardwareFeed.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
 import LinkSheet from './LinkSheet.jsx'
@@ -1496,7 +1497,14 @@ export default function MobileApp() {
   }
 
   const page = useMemo(() => {
-    if (activeTab === 'camera') return <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
+    if (activeTab === 'camera') {
+      return (
+        <>
+          <HardwareFeed />
+          <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
+        </>
+      )
+    }
     if (activeTab === 'map') {
       return (
         <section className="mobile-card campus-card">
