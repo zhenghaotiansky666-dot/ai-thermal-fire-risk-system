@@ -120,7 +120,8 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
   const cloudInfo = parseCloudChannel(cloudChannel)
   const pairCode = `TGS-PAIR:${cloudChannel}`.trim()
 
-  const received = events.filter((event) => event.kind === 'report' || event.kind === 'status')
+  // 喇叭页心跳也是 status 事件，但它不属于"用户端上报"，这里滤掉免得刷屏
+  const received = events.filter((event) => (event.kind === 'report' || event.kind === 'status') && event.from !== 'speaker')
 
   return (
     <div

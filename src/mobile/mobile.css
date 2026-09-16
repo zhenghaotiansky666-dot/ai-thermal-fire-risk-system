@@ -2118,6 +2118,25 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .hardware-drive span { display: flex; flex-direction: column; gap: 4px; }
 .hardware-drive b { display: flex; align-items: center; gap: 5px; color: #9ad6ff; font-size: 10px; }
 .hardware-drive small { color: #8fb2d2; font-size: 8px; line-height: 1.55; }
+
+/* ==== 现场喇叭（旧手机当楼道警报器）==== */
+.speaker-card { margin-bottom: 12px; border-color: rgba(248,113,113,.28); }
+.speaker-body { display: grid; grid-template-columns: 150px 1fr; gap: 12px; margin-top: 10px; align-items: start; }
+@media (max-width: 620px) { .speaker-body { grid-template-columns: 1fr; } }
+.speaker-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.speaker-qr img { width: 150px; height: 150px; padding: 6px; border-radius: 12px; background: #fff; }
+.speaker-qr-empty { display: grid; place-items: center; width: 150px; height: 150px; color: #7d97b3; border: 1px dashed rgba(96,165,250,.28); border-radius: 12px; background: rgba(4,13,27,.55); }
+.speaker-qr small { color: #8fb2d2; font-size: 8px; }
+.speaker-steps { display: flex; flex-direction: column; gap: 7px; }
+.speaker-steps span { display: flex; gap: 7px; align-items: flex-start; color: #9db6cf; font-size: 9px; line-height: 1.65; }
+.speaker-steps b { flex: 0 0 auto; color: #ffb4a8; font-size: 10px; }
+.speaker-name { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; color: #8fb2d2; font-size: 9px; }
+.speaker-name input { min-height: 40px; padding: 9px 11px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.2); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 10px; }
+.speaker-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.speaker-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px; color: #cfe3f7; border: 1px solid rgba(96,165,250,.24); border-radius: 10px; background: rgba(59,130,246,.12); font-size: 10px; font-weight: 600; }
+.speaker-actions button.primary { color: #fff; border-color: rgba(248,113,113,.5); background: linear-gradient(110deg,#dc2626,#f97316); }
+.speaker-actions button:disabled { opacity: .45; }
+.hardware-stats strong.is-live { color: #8fe8b3; }
 .ai-pair { padding: 11px 12px; border: 1px solid rgba(56,189,248,.32); border-radius: 12px; background: rgba(14,165,233,.1); display: flex; flex-direction: column; gap: 8px; }
 .ai-pair > strong { color: #dcecff; font-size: 10px; }
 .ai-pair img { display: block; width: 180px; height: 180px; margin: 0 auto; padding: 6px; border-radius: 12px; background: #fff; }

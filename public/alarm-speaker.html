@@ -68,7 +68,13 @@
   let running = false
   let cursor = ''
   let seq = 0
+  // 第一次取数用 wait=0 立刻返回，这样点「开始值守」后马上能看到"值守中"，
+  // 而不是被中继的长轮询挂住十几秒（现场演示时很显眼）
+  let firstPoll = true
   let timer = null
+  let beatTimer = null
+  let beatSeq = 0
+  const sessionId = Math.random().toString(36).slice(2, 7)
   let speakTimer = null
   let currentNotice = ''
 
@@ -170,8 +176,34 @@
   }
 
   // ---------------------------------------------------------------- 取数
+  // 心跳：每 15 秒告诉系统端"这台喇叭还在值守"，系统端面板上就能显示有几台在岗
+  // （走云端通道时跳过，省流量）
+  async function beat() {
+    if (!running || channel) return
+    const base = relayBase || ''
+    try {
+      await fetch(`${base}/sync/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          v: 1,
+          id: `speaker-${sessionId}-${++beatSeq}`,
+          kind: 'status',
+          at: Date.now(),
+          ttl: 120000,
+          from: 'speaker',
+          payload: { role: 'speaker', name: label, at: Date.now() },
+        }),
+      })
+    } catch {
+      /* 心跳失败不影响值守 */
+    }
+  }
+
   async function poll() {
     if (!running) return
+    const wait = firstPoll ? 0 : 15000
+    firstPoll = false
     try {
       if (channel.startsWith('ntfy:') || /^[A-Za-z0-9_-]{3,64}$/.test(channel)) {
         const topic = channel.startsWith('ntfy:') ? channel.slice(5) : channel
@@ -192,7 +224,7 @@
         return
       }
       const base = relayBase || ''
-      const response = await fetch(`${base}/sync/events?since=${seq}&wait=15000`, { cache: 'no-store' })
+      const response = await fetch(`${base}/sync/events?since=${seq}&wait=${wait}`, { cache: 'no-store' })
       if (!response.ok) { mark('bad', '局域网中继不可用，重试中'); return }
       const data = await response.json()
       if (Number.isFinite(Number(data?.seq))) seq = Number(data.seq)
@@ -229,6 +261,8 @@
   document.getElementById('start').addEventListener('click', () => {
     if (running) return
     running = true
+    beat()
+    beatTimer = window.setInterval(beat, 15000)
     document.getElementById('start').disabled = true
     mark('live', '正在连接…')
     // 用户手势里预热音频与语音，避免浏览器自动播放限制
@@ -245,6 +279,8 @@
   document.getElementById('stop').addEventListener('click', () => {
     running = false
     if (timer) clearTimeout(timer)
+    if (beatTimer) window.clearInterval(beatTimer)
+    beatTimer = null
     document.getElementById('start').disabled = false
     alarmOff('已停止值守')
     mark('', '未开始值守')

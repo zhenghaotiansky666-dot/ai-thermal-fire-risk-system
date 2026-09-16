@@ -64,6 +64,7 @@ import AiCommandSheet from './AiCommandSheet.jsx'
 import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdfReport } from './EmergencyPanels.jsx'
 import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from './PhasePanels.jsx'
 import HardwareFeed from './HardwareFeed.jsx'
+import SpeakerPanel from './SpeakerPanel.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
 import LinkSheet from './LinkSheet.jsx'
@@ -1500,6 +1501,11 @@ export default function MobileApp() {
     if (activeTab === 'camera') {
       return (
         <>
+          <SpeakerPanel
+            fire={fire}
+            fireText={fireLocationDetail ? `${fireLocationDetail} 发生火情` : ''}
+            onToast={setToast}
+          />
           <HardwareFeed
             onFrame={(nextFrame) => {
               // 硬件热像接入检测链路：帧结构一致，报警阈值/危险场/疏散自动复用

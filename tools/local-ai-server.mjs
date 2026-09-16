@@ -192,9 +192,10 @@ function pushEvent(event) {
   const record = { seq: relay.events.length + 1, at: Date.now(), event }
   relay.events.push(record)
   if (relay.events.length > 200) relay.events.splice(0, relay.events.length - 200)
-  let seq = record.seq - 1
   relay.waiters.forEach((waiter) => {
-    if (waiter.since >= seq) return
+    // 刚入库的这条事件序号是 record.seq，所以"已收到 >= record.seq 的人"才不需要唤醒。
+    // （之前写成 record.seq - 1，导致所有等待者都被跳过，事件只能等长轮询超时才送达）
+    if (waiter.since >= record.seq) return
     clearTimeout(waiter.timer)
     relay.waiters.delete(waiter)
     waiter.reply()
