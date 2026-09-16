@@ -20,6 +20,7 @@
 import { spawn } from 'node:child_process'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import { runDoctor, formatReport, lanAddresses, DEFAULT_MODEL } from './ai-doctor.mjs'
 
@@ -31,7 +32,8 @@ const readArg = (name, fallback) => {
 const hasFlag = (name) => args.includes(name)
 
 const model = readArg('--model', DEFAULT_MODEL)
-const sitePort = Number(readArg('--port', '4173'))
+const requestedPort = Number(readArg('--port', '4173'))
+let sitePort = requestedPort
 const upstream = readArg('--upstream', 'http://127.0.0.1:11434/v1').replace(/\/$/, '')
 const checkOnly = hasFlag('--check-only')
 const shouldOpen = !hasFlag('--no-open')
@@ -73,6 +75,24 @@ async function reachable(url, timeoutMs = 1500) {
   }
 }
 
+// 端口是否被占用（用来"把端口搞好一点"：首选端口被占就自动往后找一个空闲的）
+export function isPortBusy(port, host = '127.0.0.1') {
+  return new Promise((done) => {
+    const probe = createServer()
+    probe.once('error', () => done(true))
+    probe.once('listening', () => probe.close(() => done(false)))
+    probe.listen(port, host)
+  })
+}
+
+export async function findFreePort(start, tries = 12) {
+  for (let offset = 0; offset < tries; offset += 1) {
+    const candidate = start + offset
+    if (!(await isPortBusy(candidate))) return candidate
+  }
+  return start
+}
+
 async function ensureOllama() {
   if (!isOllama) {
     console.log(`· 使用自定义端点 ${upstream}，跳过 Ollama 启用步骤`)
@@ -89,6 +109,14 @@ async function ensureOllama() {
     return false
   }
   console.log(`· 已安装 Ollama：${version.out.trim().split('\n')[0]}`)
+
+  // 端口被别的程序占着（不是 Ollama）时，直接说清楚，别让人误以为是模型问题
+  if ((await isPortBusy(Number(ollamaPort))) && !(await reachable(`http://127.0.0.1:${ollamaPort}/api/tags`))) {
+    console.log(`⚠️ 端口 ${ollamaPort} 已被其它程序占用，且不响应 Ollama 接口。两种处理：`)
+    console.log(`   1) 关掉占用该端口的程序后重跑本脚本；`)
+    console.log(`   2) 换端口启动：OLLAMA_HOST=0.0.0.0:11435 ollama serve，然后`)
+    console.log(`      node tools/setup-local-ai.mjs --upstream http://127.0.0.1:11435/v1`)
+  }
 
   if (await reachable(`http://127.0.0.1:${ollamaPort}/api/tags`)) {
     console.log(`· Ollama 已在运行（127.0.0.1:${ollamaPort}）`)
@@ -151,6 +179,12 @@ async function ensureSite() {
     console.log(`· 本地站点已在运行（端口 ${sitePort}）`)
     return
   }
+  // 首选端口被别的程序占用时自动换一个，避免"起不来"这种低级卡点
+  const freePort = await findFreePort(sitePort)
+  if (freePort !== sitePort) {
+    console.log(`⚠️ 端口 ${sitePort} 被占用，自动改用 ${freePort}`)
+    sitePort = freePort
+  }
   await mkdir(resolve('tools'), { recursive: true })
   const logHandle = await (await import('node:fs')).openSync?.(logFile, 'a')
   const child = spawn(process.execPath, ['tools/local-ai-server.mjs', '--port', String(sitePort), '--upstream', upstream], {
@@ -183,32 +217,40 @@ function openBrowser(url) {
   } catch {}
 }
 
-console.log('== 热感哨兵 · 本地 AI 一键配置 ==')
-console.log(`模型：${model}　端点：${upstream}　站点端口：${sitePort}`)
+export async function main() {
+  console.log('== 热感哨兵 · 本地 AI 一键配置 ==')
+  console.log(`模型：${model}　端点：${upstream}　站点端口：${sitePort}`)
 
-if (!checkOnly) {
-  const ollamaReady = await ensureOllama()
-  if (ollamaReady) await ensureModel()
-  await ensureSite()
+  if (!checkOnly) {
+    const ollamaReady = await ensureOllama()
+    if (ollamaReady) await ensureModel()
+    await ensureSite()
+  }
+
+  console.log('\n== 自检 ==')
+  const report = await runDoctor({ upstream, model, siteBase: `http://127.0.0.1:${sitePort}` })
+  console.log(formatReport(report))
+
+  const lan = lanAddresses()[0]
+  const lanUrl = lan ? `http://${lan}:${sitePort}/mobile-app.html` : `http://127.0.0.1:${sitePort}/mobile-app.html`
+  console.log('\n== 给队友/手机 ==')
+  console.log(`系统端：${lanUrl}`)
+  console.log(`用户端：${lanUrl.replace('mobile-app.html', 'user-app.html')}`)
+  console.log('在页面「AI 指挥」里这样填：')
+  console.log('  推理来源：本地 Ollama（或自定义端点）')
+  console.log('  端点地址：/ai/v1        ← 同源代理，不用填 IP，也不会被浏览器拦')
+  console.log(`  模型名  ：${report.checks.find((item) => item.id === 'models')?.matched ?? model}`)
+  console.log('')
+  console.log('手机扫下面这个二维码即可打开系统端：')
+  await printQr(lanUrl)
+
+  if (shouldOpen && !checkOnly) openBrowser(`http://127.0.0.1:${sitePort}/mobile-app.html`)
+  return report
 }
 
-console.log('\n== 自检 ==')
-const report = await runDoctor({ upstream, model, siteBase: `http://127.0.0.1:${sitePort}` })
-console.log(formatReport(report))
-
-const lan = lanAddresses()[0]
-const lanUrl = lan ? `http://${lan}:${sitePort}/mobile-app.html` : `http://127.0.0.1:${sitePort}/mobile-app.html`
-console.log('\n== 给队友/手机 ==')
-console.log(`系统端：${lanUrl}`)
-console.log(`用户端：${lanUrl.replace('mobile-app.html', 'user-app.html')}`)
-console.log('在页面「AI 指挥」里这样填：')
-console.log('  推理来源：本地 Ollama（或自定义端点）')
-console.log('  端点地址：/ai/v1        ← 同源代理，不用填 IP，也不会被浏览器拦')
-console.log(`  模型名  ：${report.checks.find((item) => item.id === 'models')?.matched ?? model}`)
-console.log('')
-console.log('手机扫下面这个二维码即可打开系统端：')
-await printQr(lanUrl)
-
-if (shouldOpen && !checkOnly) openBrowser(`http://127.0.0.1:${sitePort}/mobile-app.html`)
-
-process.exit(report.ok ? 0 : 1)
+// 只有直接运行本文件时才执行配置流程（被测试或其它脚本 import 时不会乱起服务）
+const isCli = process.argv[1] && process.argv[1].endsWith('setup-local-ai.mjs')
+if (isCli) {
+  const report = await main()
+  process.exit(report.ok ? 0 : 1)
+}

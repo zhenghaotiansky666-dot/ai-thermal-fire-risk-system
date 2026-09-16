@@ -147,6 +147,20 @@ export default function AiCommandSheet({ onClose, onSaved }) {
           <button type="button" onClick={runDiagnose} disabled={diagnosing}>
             <Stethoscope size={15} /> {diagnosing ? '诊断中…' : '一键诊断'}
           </button>
+          {diagnose?.ok && diagnose?.hints?.matchedModel && (
+            <button
+              type="button"
+              className="ai-apply"
+              onClick={() => {
+                // 一键采用诊断给出的推荐值：同源代理 + 本机真实存在的模型名
+                patch({ provider: 'custom', baseUrl: diagnose.hints.endpointForBrowser || '/ai/v1', model: diagnose.hints.matchedModel })
+                setSaved('已填入推荐设置，点「保存设置」生效')
+                window.setTimeout(() => setSaved(''), 3200)
+              }}
+            >
+              <Cpu size={15} /> 应用推荐设置
+            </button>
+          )}
           <span className={`ai-probe ${probe === 'ok' ? 'is-ok' : probe === 'fail' ? 'is-fail' : ''}`}>
             {probe === 'ok' ? '端点可用，将由本地模型接管' : probe === 'fail' ? '端点不可用（仍可使用规则引擎）' : '未测试'}
           </span>

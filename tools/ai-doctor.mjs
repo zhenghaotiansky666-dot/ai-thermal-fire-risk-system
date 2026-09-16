@@ -184,6 +184,7 @@ export async function runDoctor(options = {}) {
     hints: {
       upstream,
       model,
+      matchedModel: modelCheck.matched ?? null,
       siteBase,
       endpointForBrowser: '/ai/v1',
       lanSite: lan ? `http://${lan}:${new URL(siteBase).port || 4173}/mobile-app.html` : null,
