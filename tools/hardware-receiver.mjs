@@ -18,7 +18,8 @@
 
 import { createServer } from 'node:http'
 import { createServer as createProbeServer } from 'node:net'
-import { mkdir, appendFile, writeFile } from 'node:fs/promises'
+import { mkdir, appendFile, writeFile, readFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { spawn } from 'node:child_process'
@@ -42,7 +43,22 @@ const readArg = (name, fallback) => {
 }
 const hasFlag = (name) => args.includes(name)
 
-const port = Number(readArg('--port', '5000'))
+// 端口优先级：--port 参数 > 环境变量 TG_HARDWARE_PORT > ai-config.json 的 hardwarePort > 默认 5000
+// 这样"演示电脑用哪个端口"可以在配置文件里统一，固件那边只改一次。
+function portFromConfig() {
+  for (const candidate of ['public/ai-config.json', 'ai-config.json']) {
+    try {
+      const config = JSON.parse(readFileSync(candidate, 'utf8'))
+      if (Number.isFinite(Number(config.hardwarePort))) return Number(config.hardwarePort)
+    } catch {}
+  }
+  return null
+}
+const portFromArgs = args.includes('--port') ? Number(readArg('--port', '5000')) : null
+const port = portFromArgs
+  ?? (Number.isFinite(Number(process.env.TG_HARDWARE_PORT)) ? Number(process.env.TG_HARDWARE_PORT) : null)
+  ?? portFromConfig()
+  ?? 5000
 const host = readArg('--host', '0.0.0.0')
 const strictPort = hasFlag('--strict-port')
 const visionUrl = String(readArg('--vision-url', process.env.TG_VISION_URL || '')).replace(/\/$/, '')
