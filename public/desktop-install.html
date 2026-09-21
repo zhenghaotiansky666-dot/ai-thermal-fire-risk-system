@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>电脑版指挥端 · 热感哨兵</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: #000; color: #fff; min-height: 100dvh;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        line-height: 1.7; -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 56px 24px 80px; }
+      .kicker { color: #ff3b30; font-size: 14px; letter-spacing: .18em; text-transform: uppercase; }
+      h1 { font-size: clamp(30px, 4.2vw, 46px); margin: 14px 0 10px; letter-spacing: -.02em; }
+      .lead { color: rgba(235,235,245,.6); font-size: 17px; margin: 0 0 40px; max-width: 760px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+      .card { border: 1px solid rgba(84,84,88,.5); border-radius: 18px; padding: 24px; background: #1c1c1e; }
+      .card h2 { font-size: 19px; margin: 0 0 6px; }
+      .card .tag { display: inline-block; font-size: 12px; color: rgba(235,235,245,.5); border: 1px solid rgba(84,84,88,.6); border-radius: 999px; padding: 2px 10px; margin-bottom: 12px; }
+      .card p { color: rgba(235,235,245,.62); font-size: 15px; margin: 0 0 16px; }
+      .card ol { color: rgba(235,235,245,.72); font-size: 15px; padding-left: 20px; margin: 0 0 16px; }
+      code { background: rgba(120,120,128,.22); border-radius: 6px; padding: 2px 6px; font-size: 13px; color: #9ad6ff; }
+      pre { background: #0d0d0f; border: 1px solid rgba(84,84,88,.45); border-radius: 12px; padding: 12px 14px; overflow: auto; font-size: 12.5px; color: #cfe3f7; }
+      .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+      a.btn {
+        display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px;
+        border-radius: 12px; text-decoration: none; font-size: 15px; font-weight: 600;
+        background: #ff3b30; color: #fff; border: none;
+      }
+      a.btn.ghost { background: rgba(120,120,128,.18); color: #fff; border: 1px solid rgba(84,84,88,.6); }
+      .note { margin-top: 40px; padding: 18px 20px; border-radius: 16px; background: rgba(48,209,88,.08); border: 1px solid rgba(48,209,88,.28); color: rgba(235,235,245,.75); font-size: 14.5px; }
+      .note b { color: #30d158; }
+      footer { margin-top: 46px; color: rgba(235,235,245,.35); font-size: 13px; }
+      .back { color: rgba(235,235,245,.55); text-decoration: none; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="kicker">Desktop Console</div>
+      <h1>把指挥端装到电脑上</h1>
+      <p class="lead">
+        电脑版和手机版是同一套系统：宽的屏幕会自动变成「左侧导航 + 多列监看卡片墙」，
+        适合把一台电脑放在值班室或展台当监看终端。下面三种用法按需要选一种。
+      </p>
+
+      <div class="grid">
+        <div class="card">
+          <span class="tag">最快</span>
+          <h2>① 直接用浏览器打开</h2>
+          <p>不需要安装任何东西。用大屏电脑打开下面的地址即可，界面会自动切到电脑布局。</p>
+          <div class="actions">
+            <a class="btn" href="./mobile-app.html">打开电脑版指挥端</a>
+            <a class="btn ghost" href="./mobile-app.html?monitor=1">直接进监看模式</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <span class="tag">离线可用</span>
+          <h2>② 下载后一键启动</h2>
+          <p>把整套东西（站点 + 本地服务 + 硬件接收端 + 启动脚本）下载到电脑，解压后双击启动：</p>
+          <ol>
+            <li>下载源码包（压缩包内已含 <code>启动电脑版.command</code> / <code>启动电脑版.bat</code>）</li>
+            <li>macOS 双击 <code>启动电脑版.command</code>，Windows 双击 <code>启动电脑版.bat</code></li>
+            <li>脚本会自动检查环境、构建站点、启动服务，并用独立窗口打开指挥端</li>
+          </ol>
+          <pre id="cmd">git clone https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system.git
+cd ai-thermal-fire-risk-system
+./启动电脑版.command        # Windows: 启动电脑版.bat</pre>
+          <div class="actions">
+            <a class="btn" href="https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system/archive/refs/heads/main.zip">下载源码包（zip）</a>
+            <a class="btn ghost" href="https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system">打开 GitHub 仓库</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <span class="tag">像 App 一样</span>
+          <h2>③ 装成独立窗口</h2>
+          <p>想让它看起来像桌面软件（没有地址栏、可放程序坞/任务栏）就用这一招：</p>
+          <ol>
+            <li><b>Chrome / Edge</b>：打开指挥端 → 菜单 → 保存并分享 → 安装为应用 / 创建快捷方式（勾选“以窗口方式打开”）</li>
+            <li><b>Safari</b>：文件 → 添加到程序坞（macOS 14+）</li>
+            <li>命令行方式（macOS）：<code>open -na "Google Chrome" --args --app=http://127.0.0.1:4173/mobile-app.html?monitor=1</code></li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <span class="tag">监看模式</span>
+          <h2>大屏值守怎么用</h2>
+          <p>
+            点右上角 <b>「电脑监看」</b>，左侧导航会收起、内容铺满整屏并进入全屏；
+            或者在网址后面加 <code>?monitor=1</code> 直接进监看模式。
+            设置会记住，下次打开自动保持。
+          </p>
+          <p>火警时整屏会转红并弹出全屏报警卡，与用户端、楼道喇叭同时响应。</p>
+        </div>
+
+        <div class="card">
+          <span class="tag">给硬件同学</span>
+          <h2>要改硬件参数从这里入手</h2>
+          <p>端口、上传路由、终审阈值、固件地址都能改，改完刷新页面即可：</p>
+          <ol>
+            <li><code>public/ai-config.json</code> → <code>hardwarePort</code> 改接收端端口（默认 5000，macOS 建议 8787）</li>
+            <li><code>tools/hardware-receiver.mjs</code> → <code>/upload</code>、<code>/upload_thermal</code> 两个路由与终审顺序</li>
+            <li><code>tools/local-ai-server.mjs --hardware-port</code> → 本地服务转发给接收端的端口</li>
+            <li>详细步骤见仓库里的 <code>docs/硬件同学-编辑指南.md</code></li>
+          </ol>
+          <p>不会用 git 也可以：下载上面的源码包，改完把你改的文件发回来，我合并。</p>
+        </div>
+      </div>
+
+      <div class="note">
+        <b>提示：</b>电脑版和手机版共用同一份数据与同一条链路（局域网中继 / 云端通道），
+        所以电脑上报警，手机端与楼道喇叭会同时响应；反过来手机上报火源，电脑这边也会立刻看到。
+      </div>
+
+      <footer>
+        <a class="back" href="./mobile-app.html">← 返回指挥端</a> ·
+        热感哨兵 · AI 热感火警预警与动态疏散系统
+      </footer>
+    </div>
+  </body>
+</html>

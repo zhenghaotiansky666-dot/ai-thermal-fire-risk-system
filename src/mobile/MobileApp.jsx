@@ -34,6 +34,7 @@ import {
   LocateFixed,
   Map,
   MapPin,
+  MonitorSmartphone,
   Navigation,
   Plus,
   RadioTower,
@@ -42,6 +43,7 @@ import {
   Rotate3D,
   Route,
   Save,
+  Download,
   ScanLine,
   ShieldAlert,
   ShieldCheck,
@@ -783,6 +785,18 @@ export default function MobileApp() {
   const [frameHistory, setFrameHistory] = useState([])
   const [rescueBrief, setRescueBrief] = useState(null)
   const [showLinkSheet, setShowLinkSheet] = useState(false)
+  // 电脑监看模式：收起左侧导航、全屏铺开主区，适合把这台电脑挂在大屏上当值守终端
+  const [monitorMode, setMonitorMode] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false
+      const fromUrl = new URLSearchParams(window.location.search).get('monitor')
+      if (fromUrl === '1') return true
+      if (fromUrl === '0') return false
+      return localStorage.getItem('thermalGuardMonitor') === '1'
+    } catch {
+      return false
+    }
+  })
   const [aiState, setAiState] = useState(() => aiStatus())
   const [peerEvents, setPeerEvents] = useState([])
   // 最近一条"还没处置"的用户端上报（系统端横幅用它提醒指挥人员）
@@ -1630,7 +1644,7 @@ export default function MobileApp() {
   }, [activeTab, alertSection, dashView, alerts, cameras, selectedCamera, selectedCameraId, image, fileName, detecting, progress, detected, riskAdjustedResult, phase, alarm, fire, settings, audioReady, route, position, blockedNodes, nowMs, activeDevice, frameHistory, rescueBrief, crowd])
 
   return (
-    <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''}`}>
+    <div className={`mobile-app-shell ${alarm ? 'has-alarm' : ''} ${monitorMode ? 'desktop-monitor' : ''}`}>
       {demoMode && demoStep > 0 && (
         <div className="demo-banner">
           <span className="demo-badge">演示 {demoStep}/5</span>
@@ -1650,6 +1664,40 @@ export default function MobileApp() {
         </span>
         <div className="top-actions">
           <ConnectionBadge state={connection} />
+          <button
+            type="button"
+            className="ai-entry desktop-entry"
+            title={monitorMode ? '退出电脑监看模式' : '电脑监看模式：收起导航、全屏铺开，适合挂在大屏值守'}
+            onClick={() => {
+              const next = !monitorMode
+              setMonitorMode(next)
+              try {
+                localStorage.setItem('thermalGuardMonitor', next ? '1' : '0')
+              } catch {
+                /* 隐私模式忽略 */
+              }
+              try {
+                if (next) document.documentElement.requestFullscreen?.().catch(() => {})
+                else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+              } catch {
+                /* 浏览器不允许全屏时忽略 */
+              }
+              setToast(next ? '已进入电脑监看模式（再点一次退出）' : '已退出电脑监看模式')
+            }}
+          >
+            <MonitorSmartphone size={15} />
+            <span>{monitorMode ? '退出监看' : '电脑监看'}</span>
+          </button>
+          <a
+            className="ai-entry desktop-entry"
+            href="./desktop-install.html"
+            target="_blank"
+            rel="noreferrer"
+            title="把指挥端装到这台电脑上（含一键启动与独立窗口）"
+          >
+            <Download size={15} />
+            <span>电脑版</span>
+          </a>
           <button
             type="button"
             className={`ai-entry ai-entry-${aiState.probing ? 'probing' : aiState.tone}`}
