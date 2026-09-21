@@ -144,6 +144,14 @@ const defaultCameras = [
   { id: 'demo-live', name: '热感监控演示', location: '三楼东侧走廊', type: 'demo', url: DEMO_LIVE, public: true },
 ]
 
+// 从「燧瞳智感 · 电脑端」导入的监控项。只在首次迁移时补齐缺失项，
+// 不覆盖第一套软件已有的监控，也不改动其他本地设置。
+const CAMERA_IMPORT_VERSION = 'zhenghaotian-2026-09-21'
+const importedCameras = [
+  { id: 'esp32-camera', name: '楼道实景监控', location: '4楼走廊', type: 'mjpeg', url: 'http://127.0.0.1:5011/stream.mjpg', public: false },
+  { id: 'local-phone-cam', name: '本机实景摄像头', location: '手机后置摄像头', type: 'local', url: 'local://camera', public: false },
+]
+
 function encodeCamera(camera) {
   const bytes = new TextEncoder().encode(JSON.stringify(camera))
   let binary = ''
@@ -176,6 +184,14 @@ function initialCameraState() {
     const saved = JSON.parse(localStorage.getItem('thermalGuardCameras') || 'null')
     if (Array.isArray(saved) && saved.length) base = saved
     if (!base.some((camera) => camera.type === 'sensor')) base = [defaultCameras[0], ...base]
+    if (localStorage.getItem('thermalGuardCameraImportVersion') !== CAMERA_IMPORT_VERSION) {
+      const merged = [...base]
+      importedCameras.forEach((camera) => {
+        if (!merged.some((item) => item.id === camera.id)) merged.push(camera)
+      })
+      base = merged
+      localStorage.setItem('thermalGuardCameraImportVersion', CAMERA_IMPORT_VERSION)
+    }
   } catch {}
   const shared = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('camera') : null
   const parsed = shared ? decodeCamera(shared) : null
@@ -593,6 +609,7 @@ function LivePlayer({ camera, frame, viewMode }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
   const [currentTime, setCurrentTime] = useState(() => new Date().toLocaleString('zh-CN', { hour12: false }))
+  const [localCameraError, setLocalCameraError] = useState('')
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date().toLocaleString('zh-CN', { hour12: false })), 1000)
@@ -600,7 +617,7 @@ function LivePlayer({ camera, frame, viewMode }) {
   }, [])
 
   useEffect(() => {
-    if (!camera || viewMode === 'thermal3d' || camera.type === 'sensor' || camera.type === 'demo' || camera.type === 'mjpeg') return undefined
+    if (!camera || viewMode === 'thermal3d' || camera.type !== 'hls') return undefined
     const video = videoRef.current
     if (!video) return undefined
     let hls
@@ -630,6 +647,38 @@ function LivePlayer({ camera, frame, viewMode }) {
     }
   }, [camera, viewMode])
 
+  useEffect(() => {
+    if (!camera || camera.type !== 'local' || viewMode === 'thermal3d') {
+      setLocalCameraError('')
+      return undefined
+    }
+
+    let stream
+    let cancelled = false
+    const start = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('camera-not-supported')
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+        if (cancelled || !videoRef.current) {
+          stream.getTracks().forEach((track) => track.stop())
+          return
+        }
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => {})
+        setLocalCameraError('')
+      } catch {
+        if (!cancelled) setLocalCameraError('无法打开本机摄像头，请检查浏览器权限。')
+      }
+    }
+    start()
+
+    return () => {
+      cancelled = true
+      stream?.getTracks().forEach((track) => track.stop())
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+  }, [camera?.id, camera?.type, viewMode])
+
   const enterFullscreen = () => {
     const element = playerRef.current
     if (!element) return
@@ -643,6 +692,8 @@ function LivePlayer({ camera, frame, viewMode }) {
       {viewMode !== 'thermal3d' && camera.type === 'demo' && <img src={camera.url} alt={`${camera.name}演示监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'mjpeg' && <img src={camera.url} alt={`${camera.name}实时监控`} />}
       {viewMode !== 'thermal3d' && camera.type === 'hls' && <video ref={videoRef} controls muted autoPlay playsInline />}
+      {viewMode !== 'thermal3d' && camera.type === 'local' && <video ref={videoRef} controls muted autoPlay playsInline />}
+      {viewMode !== 'thermal3d' && camera.type === 'local' && localCameraError && <div className="live-camera-error">{localCameraError}</div>}
       <div className="live-grid" />
       {camera.type === 'demo' && <div className="live-scan" />}
       <div className="live-status"><i />{viewMode === 'thermal3d' || camera.type === 'sensor' ? '热感板联动' : camera.type === 'demo' ? '公开演示流' : camera.public ? '公开监控' : '本机监控'}</div>
@@ -659,7 +710,7 @@ function CameraSheet({ editing, onClose, onSave }) {
   const [type, setType] = useState(editing?.type || 'hls')
   const [url, setUrl] = useState(editing?.url || '')
   const [isPublic, setIsPublic] = useState(Boolean(editing?.public))
-  const valid = name.trim() && (type === 'demo' || type === 'sensor' || /^https?:\/\//i.test(url.trim()))
+  const valid = name.trim() && (type === 'demo' || type === 'sensor' || type === 'local' || /^https?:\/\//i.test(url.trim()))
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -668,11 +719,11 @@ function CameraSheet({ editing, onClose, onSave }) {
         <div className="sheet-head"><div><span>监控联动</span><strong>{editing ? '编辑监控' : '添加监控'}</strong></div><button type="button" onClick={onClose}><X size={18} /></button></div>
         <label>监控名称<input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：三楼东侧走廊" /></label>
         <label>安装位置<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="例如：消防通道入口" /></label>
-        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE); if (e.target.value === 'sensor') setUrl('sensor://esp32-sim') }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="sensor">3D 热感模拟板</option><option value="demo">内置公开演示流</option></select></label>
-        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo' || type === 'sensor'} /></label>
+        <label>监控类型<select value={type} onChange={(e) => { setType(e.target.value); if (e.target.value === 'demo') setUrl(DEMO_LIVE); if (e.target.value === 'sensor') setUrl('sensor://esp32-sim'); if (e.target.value === 'local') setUrl('local://camera') }}><option value="hls">HLS 实时流</option><option value="mjpeg">MJPEG 实时流</option><option value="sensor">3D 热感模拟板</option><option value="demo">内置公开演示流</option><option value="local">本机实景摄像头</option></select></label>
+        <label>监控地址<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/live.m3u8" inputMode="url" autoCapitalize="none" disabled={type === 'demo' || type === 'sensor' || type === 'local'} /></label>
         <label className="public-toggle"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} /><span><strong>允许通过分享链接公开查看</strong><small>请勿公开包含人员、住宅、门禁或消防设施细节的画面</small></span></label>
         <div className="sheet-tip"><Info size={14} />RTSP 地址不能被手机浏览器直接播放，需要海康、大华 NVR 或媒体网关转换为 HLS/WebRTC。</div>
-        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : type === 'sensor' ? 'sensor://esp32-sim' : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
+        <button className="sheet-save" type="button" disabled={!valid} onClick={() => onSave({ name: name.trim(), location: location.trim(), type, url: type === 'demo' ? DEMO_LIVE : type === 'sensor' ? 'sensor://esp32-sim' : type === 'local' ? 'local://camera' : url.trim(), public: isPublic })}><Save size={16} />保存监控</button>
       </section>
     </div>
   )
