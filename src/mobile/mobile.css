@@ -2317,3 +2317,143 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .vital-row strong { color: #d9ecfb; font-size: 10px; }
 .vital-row small { color: #8fb2d2; font-size: 8px; }
 .vital-row em { color: #fbbf24; font-size: 8px; font-style: normal; }
+
+/* ============================================================
+   电脑版（桌面监看）布局
+
+   宽屏下把"手机壳"改成一台监看终端：
+   · 底部标签栏 → 左侧竖向导航栏（固定 236px）
+   · 主区从单列 720px → 自适应多列卡片墙（最多 3 列）
+   · 「电脑监看」模式进一步收起导航、放大信息密度，适合挂在大屏上
+   窄屏（手机/平板）完全不受影响，仍是原来的体验。
+   ============================================================ */
+
+@media (min-width: 1180px) {
+  .mobile-app-shell {
+    /* 覆盖平板档的「整壳限宽 720px 居中」，桌面版要铺满整屏 */
+    max-width: none;
+    margin: 0;
+    padding-bottom: 0;
+    padding-left: 236px;
+  }
+
+  /* 顶部栏让开左栏，并保持吸顶 */
+  .mobile-topbar {
+    padding-left: 20px;
+    min-height: 60px;
+  }
+  .mobile-topbar .nav-title { left: auto; right: 20px; }
+
+  /* 底部标签栏 → 左侧竖向导航 */
+  .mobile-tabs {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 236px;
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 78px 12px 18px;
+    border-top: none;
+    border-right: 1px solid var(--separator-soft);
+    background: rgba(14, 14, 16, .94);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+  .mobile-tabs::before {
+    content: "热感哨兵 · 指挥端";
+    position: absolute;
+    left: 20px;
+    top: 26px;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+  }
+  .mobile-tabs button {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 11px;
+    color: var(--text-2);
+  }
+  .mobile-tabs button span { font-size: 15px; }
+  .mobile-tabs button.active { color: #fff; background: var(--surface-2); }
+
+  /* 主区：自适应多列卡片墙 */
+  .mobile-main {
+    max-width: 1760px;
+    margin: 0 auto;
+    padding: 0 22px;
+    /* 主区本身也是网格：像监控页这种"直接挂几张卡片"的页面会并排，
+       而标准页面（内部是 .mobile-page）整块铺满后用自己的网格排版 */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+  .mobile-page {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    gap: 18px;
+    align-items: start;
+    padding: 22px 0 40px;
+  }
+  .mobile-page > * { margin-bottom: 0; }
+
+  /* 需要整行铺满的内容 */
+  .mobile-page > .campus-card,
+  .mobile-page > .live-player,
+  .mobile-page > .live-card,
+  .mobile-page > .chart-card.chart-wide,
+  .mobile-page > .floorplan-card,
+  .mobile-page > .escape-card,
+  .mobile-page > .mobile-card.hero-card,
+  .mobile-main > .campus-card,
+  .mobile-main > .live-player,
+  .mobile-main > .floorplan-card,
+  .home-page > *,
+  .camera-page > * { grid-column: 1 / -1; }
+
+  /* 检测页与监控页保持单列大图，其余页面走多列 */
+  .mobile-page.home-page,
+  .mobile-page.camera-page { grid-template-columns: 1fr; }
+
+  /* 分段控件与警示条跟随左栏 */
+  .segmented-wrap { padding-left: 22px; padding-right: 22px; }
+
+  /* 底部标签栏在桌面档下已经变成左栏，这里覆盖平板档的居中胶囊定位 */
+  .mobile-tabs {
+    left: 0;
+    right: auto;
+    transform: none;
+  }
+}
+
+/* 「电脑监看」模式：收起左栏、放大主区，适合挂在大屏上 */
+@media (min-width: 1180px) {
+  .mobile-app-shell.desktop-monitor { padding-left: 0; }
+  .mobile-app-shell.desktop-monitor .mobile-tabs {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .mobile-app-shell.desktop-monitor .mobile-topbar { padding-left: 26px; }
+  .mobile-app-shell.desktop-monitor .mobile-main { max-width: none; padding: 0 30px; }
+  .mobile-app-shell.desktop-monitor .mobile-page { grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); }
+  .mobile-app-shell.desktop-monitor .mobile-page.home-page,
+  .mobile-app-shell.desktop-monitor .mobile-page.camera-page { grid-template-columns: 1fr; }
+}
+
+/* 手机端永远不显示「电脑监看」入口 */
+.desktop-entry { display: none; }
+@media (min-width: 1180px) {
+  .desktop-entry { display: inline-flex; }
+}
