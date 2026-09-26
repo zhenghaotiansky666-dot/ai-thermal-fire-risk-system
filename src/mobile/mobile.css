@@ -724,6 +724,22 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .live-camera-name svg { grid-row: span 2; color: var(--text-2); }
 .live-camera-name span { font-size: var(--t-caption); font-weight: 600; }
 .live-camera-name small { color: var(--text-2); font-size: var(--t-caption-2); }
+.live-camera-error {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(78%, 360px);
+  padding: 12px 14px;
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, .38);
+  border-radius: 12px;
+  background: rgba(30, 6, 10, .78);
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(10px);
+}
 .fullscreen-button {
   position: absolute;
   right: 10px;
