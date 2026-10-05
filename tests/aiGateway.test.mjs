@@ -7,6 +7,7 @@ import {
   normalizeGatewayPayload,
   toVisionEvidence,
 } from '../src/shared/aiGateway.js'
+import { fusePreventionSignals } from '../src/shared/aiPhases.js'
 
 let failures = 0
 function check(name, condition, detail = '') {
@@ -83,6 +84,36 @@ console.log('[4] 无火情但有视频流时：证据为空但通道仍然在线
   const calm = toVisionEvidence({ detections: [{ class: 'person', confidence: 0.9 }], risk: 'low', timestamp: iso(0) }, { now: NOW })
   check('人物不产生火焰/烟雾证据', calm.flame === null && calm.smoke === null)
   check('文案说清“未识别到火焰或烟雾”', calm.note.includes('未识别到'))
+}
+
+console.log('[5] 接进判决链：网关证据真的能改变阶段一的报警结论')
+{
+  const payload = {
+    camera_id: 'laptop-ai-camera',
+    risk: 'high',
+    max_temp: 42,
+    detections: [
+      { class: 'flame', confidence: 0.87, bbox: [0.55, 0.34, 0.14, 0.18] },
+      { class: 'smoke', confidence: 0.92, bbox: [0.22, 0.23, 0.2, 0.2] },
+    ],
+    timestamp: new Date(NOW).toISOString(),
+  }
+  const thermalOnly = { thermal: { maxTemp: 30 }, thresholds: { high: 65, medium: 45 } }
+
+  const baseline = fusePreventionSignals({ ...thermalOnly, visual: {} })
+  check('只有热像、温度正常时 → 不报警', baseline.level === 'normal')
+
+  const visual = toVisionEvidence(payload, { now: NOW })
+  const withGateway = fusePreventionSignals({ ...thermalOnly, visual })
+  check('接入网关后：火焰 87% + 烟雾 92% 双路确认 → 报警', withGateway.level === 'alarm')
+  check('判据里写明视觉证据', withGateway.reasons.join(' ').includes('视觉'))
+
+  const stale = toVisionEvidence(payload, { now: NOW + GATEWAY_FRESH_MS + 1000 })
+  const afterTimeout = fusePreventionSignals({ ...thermalOnly, visual: stale })
+  check('网关断流后不再凭旧帧报警', afterTimeout.level !== 'alarm')
+
+  const offline = fusePreventionSignals({ ...thermalOnly, visual: toVisionEvidence(payload, { now: NOW, connected: false }) })
+  check('网关未连接时不报警', offline.level !== 'alarm')
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)
