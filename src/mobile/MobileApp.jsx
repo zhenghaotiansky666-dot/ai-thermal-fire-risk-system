@@ -186,7 +186,7 @@ function initialCameraState() {
 }
 
 const initialDevices = [
-  { id: 'demo-lab', name: '实验室 ESP32', location: '澳门科技大学 P11', url: 'wss://192.168.4.1:81/' },
+  { id: 'demo-lab', name: '实验室 ESP32', location: '演示楼 P11', url: 'wss://192.168.4.1:81/' },
 ]
 
 const sampleAlerts = [
@@ -406,7 +406,7 @@ function AlertsPage({ alerts, onToast }) {
               return {
                 system: '热感哨兵 · 系统端',
                 generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-                location: '澳门科技大学校园数字孪生 · 检测日志汇总',
+                location: '校园数字孪生 · 检测日志汇总',
                 risk: worst,
                 riskLabel: riskTitle(worst),
                 riskIndex: Math.min(99, Math.round(maxTemp)),
@@ -1130,7 +1130,7 @@ export default function MobileApp() {
   const buildIncidentReport = () => ({
     system: '热感哨兵 · AI 火警预警与动态疏散系统',
     generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-    location: fireLocationDetail || alarm?.location || '澳门科技大学校园数字孪生',
+    location: fireLocationDetail || alarm?.location || '校园数字孪生',
     risk: alarm?.risk || resultRisk,
     riskLabel: riskTitle(alarm?.risk || resultRisk),
     riskIndex: Math.min(99, Math.round(Number(result.maxTemp) || 0)),
@@ -1552,7 +1552,7 @@ export default function MobileApp() {
       return (
         <section className="mobile-card campus-card">
           <div className="card-title">
-            <div><strong>校园三维态势</strong><small>澳门科技大学校园微缩模型 · 火源定位到具体楼层</small></div>
+            <div><strong>校园三维态势</strong><small>校园微缩模型 · 火源定位到具体楼层</small></div>
             <div className="view-switcher view-switcher-compact">
               <button type="button" className={mapView === 'campus' ? 'active' : ''} onClick={() => setMapView('campus')}>校园 3D</button>
               <button type="button" className={mapView === 'city' ? 'active' : ''} onClick={() => setMapView('city')}>城市热力图</button>

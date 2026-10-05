@@ -16,8 +16,8 @@ export const AUTO_JOIN_KEY = 'thermalGuardAutoJoin'
 export const DEFAULT_AREAS = [
   {
     id: 'must-campus',
-    label: '澳门科技大学校园',
-    channel: 'ntfy:tg-must-campus-demo-2026',
+    label: '校园演示园区',
+    channel: 'ntfy:tg-campus-demo-2026',
     lat: CAMPUS_CENTER.lat,
     lon: CAMPUS_CENTER.lon,
     // 校园边界再加一点缓冲，校门外的马路也能收到
