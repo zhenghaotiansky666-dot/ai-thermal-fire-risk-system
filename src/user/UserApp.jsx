@@ -1,4 +1,4 @@
-// 热感哨兵 · 用户端
+// FireAegis · 用户端
 // 设计参考 iOS 自带「指南针」：单屏、一个大表盘、读数在表盘正中、几乎没有卡片与按钮。
 // 全部信息压缩成三件事：往哪个方向走、还有多远、走哪条楼梯。
 
@@ -22,6 +22,7 @@ import {
   summarizeForRescue,
 } from './binaryDialogue.js'
 import { createEvent, fireFromEvent, sharedEventBus } from '../shared/eventBus.js'
+import { copilotFromEvidence } from '../shared/offlineCopilot.js'
 import OfflineLink from './OfflineLink.jsx'
 import ScanSheet from './ScanSheet.jsx'
 import {
@@ -369,10 +370,26 @@ export default function UserApp() {
     }
     return null
   }, [hazard, position.floor])
-  const route = useMemo(
-    () => computeRoute({ startId: positionNodeId(position.floor, position.spot), fire: hazardSources, elapsedSec }),
-    [position.floor, position.spot, hazardSources, elapsedSec],
-  )
+  // 离线 AI 决策树（队友交付 ai/offline_copilot.c）：温度 / 烟雾 / 通道受阻，
+  // 判为 BLOCK 时把这条出口交给路线规划封掉，自动改走另一条。
+  const hotTemp = useMemo(() => {
+    const list = (telemetry?.nodes ?? []).map((node) => Number(node?.temp)).filter((value) => Number.isFinite(value))
+    return list.length ? Math.max(...list) : 0
+  }, [telemetry])
+
+  const route = useMemo(() => {
+    const startId = positionNodeId(position.floor, position.spot)
+    const base = computeRoute({ startId, fire: hazardSources, elapsedSec })
+    if (!base?.ok) return base
+    const copilot = copilotFromEvidence({
+      thermal: { maxTemp: hotTemp },
+      visual: {},
+      isBlocked: false,
+    })
+    if (!copilot.block) return { ...base, copilot }
+    const rerouted = computeRoute({ startId, fire: hazardSources, elapsedSec, blocked: [base.exitId] })
+    return { ...(rerouted?.ok ? rerouted : base), copilot, rerouted: Boolean(rerouted?.ok) }
+  }, [position.floor, position.spot, hazardSources, elapsedSec, hotTemp])
 
   const sourceCount = route?.originCount ?? hazardSources.length
   const originFloors = [...new Set((route?.originIds || []).map((id) => BUILDING.nodes[id]?.floor).filter(Boolean))]
@@ -645,6 +662,13 @@ export default function UserApp() {
           </div>
 
           {sensorInfo && <div className="sensor-note">{sensorInfo}</div>}
+
+          {route?.copilot?.block && (
+            <div className="sensor-note is-copilot">
+              离线 AI 决策树：{route.copilot.reason}
+              {route.rerouted ? ' · 已自动改走另一条出口' : ''}
+            </div>
+          )}
 
           {linkNotice && (
             <div className="link-note">

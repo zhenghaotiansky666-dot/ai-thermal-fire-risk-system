@@ -9,7 +9,7 @@ if "%HW%"=="" set HW=8787
 if "%MONITOR%"=="" set MONITOR=1
 
 echo ==============================================
-echo  热感哨兵 · 电脑版指挥端（Windows）
+echo  FireAegis · 电脑版指挥端（Windows）
 echo ==============================================
 
 where node >nul 2>nul
@@ -54,14 +54,14 @@ if not exist dist\index.html (
   call npm run build
 )
 
-start "热感哨兵-硬件接收端" /min cmd /c "node tools\hardware-receiver.mjs --port %HW%"
+start "FireAegis-硬件接收端" /min cmd /c "node tools\hardware-receiver.mjs --port %HW%"
 echo · 硬件接收端：http://127.0.0.1:%HW%
 
 set URL=http://127.0.0.1:%PORT%/mobile-app.html
 if "%MONITOR%"=="1" set URL=%URL%?monitor=1
 
 echo · 正在启动站点…
-start "热感哨兵-站点" /min cmd /c "node tools\local-ai-server.mjs --port %PORT% --hardware-port %HW%"
+start "FireAegis-站点" /min cmd /c "node tools\local-ai-server.mjs --port %PORT% --hardware-port %HW%"
 
 echo · 等待站点就绪…
 timeout /t 6 /nobreak >nul

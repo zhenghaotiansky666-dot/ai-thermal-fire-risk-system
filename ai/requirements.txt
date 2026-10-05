@@ -1,0 +1,6 @@
+# FireAegis 本地 AI 服务依赖（在跑摄像头的那台电脑上装一次）
+ultralytics>=8.3.0
+flask>=3.0.0
+flask-cors>=4.0.0
+opencv-python>=4.8.0
+pillow>=10.0.0

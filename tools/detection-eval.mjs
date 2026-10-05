@@ -93,7 +93,7 @@ const highSweep = [45, 50, 55, 60, 65, 70, 75, 80].map((high) => ({ high, ...sum
 const sustainedSweep = [5, 10, 20, 30, 45, 60].map((sustainedSec) => ({ sustainedSec, ...summarize({ ...DEFAULT_DETECTION, sustainedSec }) }))
 
 const lines = []
-lines.push('# 热感哨兵 · 误报抑制代价曲线')
+lines.push('# FireAegis · 误报抑制代价曲线')
 lines.push('')
 lines.push(`生成时间：${new Date().toISOString()}　｜　采样步长 ${STEP} 秒`)
 lines.push('')

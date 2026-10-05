@@ -135,7 +135,7 @@ const printFirmware = hasFlag('--print-firmware')
 // 网线接入：指定用哪张网卡的地址写进固件（不指定就自动挑有线那张）
 const preferInterface = readArg('--interface', '')
 const medium = readArg('--medium', '')
-// 确认火情后把事件广播出去，让「现场警报喇叭页」和用户端一起反应
+// 确认火情后把事件广播出去，让用户端一起反应
 const publishUrl = readArg('--publish-url', process.env.TG_PUBLISH_URL || 'http://127.0.0.1:4173/sync/publish')
 const publishChannel = readArg('--publish-channel', process.env.TG_PUBLISH_CHANNEL || '')
 const nodeId = readArg('--node', process.env.TG_NODE_ID || 'C4')
@@ -164,7 +164,7 @@ export function buildAlertPhrase({ maxTemp, smoke, repeat = false } = {}) {
   return `注意，这里发生火灾，${where}，请立即沿安全出口撤离，不要乘坐电梯。`
 }
 
-// 硬件火情事件（结构与系统端一致，两端与喇叭页都能直接消费）
+// 硬件火情事件（结构与系统端一致，两端都能直接消费）
 export function buildHardwareFireEvent({ nodeId: id = 'C4', floor = 4, maxTemp, smoke, at = Date.now(), source = '硬件节点' } = {}) {
   // 注意 null 会被 Number() 变成 0，必须显式排除，否则会报"最高温度 0 度"
   const numeric = (value) => (value === null || value === undefined || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null))
@@ -506,7 +506,7 @@ async function readBody(request, limitBytes = 8 * 1024 * 1024) {
 }
 
 const PAGE = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" /><title>硬件接收端 · 热感哨兵</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" /><title>硬件接收端 · FireAegis</title>
 <style>body{margin:0;background:#06101f;color:#f3f8ff;font:14px/1.7 -apple-system,"PingFang SC",sans-serif}
 main{width:min(900px,calc(100% - 32px));margin:0 auto;padding:28px 0 60px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:680px){.grid{grid-template-columns:1fr}}
@@ -605,7 +605,7 @@ const server = createServer(async (request, response) => {
       if (decision.answer === 'YES') {
         speakAlert({ maxTemp: latestThermal?.maxTemp, smoke: null })
         pushLog({ at: Date.now(), answer: 'SPEAK', source: 'alert-speak', reason: buildAlertPhrase({ maxTemp: latestThermal?.maxTemp, repeat: spokenCount > 1 }) })
-        // 广播给「现场警报喇叭页」和用户端：楼道里的旧手机也会响
+        // 广播给用户端：楼道里的旧手机也会响
         await publishFireEvent({ maxTemp: latestThermal?.maxTemp, smoke: null })
       }
       // 固件用 HTTPClient.getString() 和 "YES" 做字符串比较，所以这里必须返回恰好这两个字母
@@ -744,8 +744,7 @@ function printBanner() {
   console.log(`  终审策略：  ${visionUrl ? `YOLO 视觉服务 ${visionUrl}（阈值 ${visionConf}）` : `热像阈值 ${yesTemp}°C`}${alwaysYes ? ' · 强制 YES（演示）' : ''}`)
   console.log(`  落盘目录：  ${outDir}`)
   console.log(`  现场播报：  ${speak ? `开启（每 ${speakRepeatSec} 秒重复，可用 --no-speak 关闭）` : '已关闭'}`)
-  console.log(`  事件广播：  ${publishUrl || '未配置'}${publishChannel ? ` + 云端 ${publishChannel}` : ''}（确认火情后通知喇叭页与用户端）`)
-  console.log(`  喇叭页：    http://127.0.0.1:${activePort}/alarm-speaker.html 或站点 http://127.0.0.1:4173/alarm-speaker.html`)
+  console.log(`  事件广播：  ${publishUrl || '未配置'}${publishChannel ? ` + 云端 ${publishChannel}` : ''}（确认火情后通知用户端）`)
   if (activePort !== port) {
     console.log('')
     console.log(`⚠️ 实际端口是 ${activePort}（不是 ${port}）：固件里 serverUrl / thermalServerUrl 的端口要一并改成 ${activePort}`)

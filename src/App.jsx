@@ -121,7 +121,7 @@ function Logo() {
         <span className="brand-pulse" />
       </span>
       <span className="brand-copy">
-        <strong>热感哨兵</strong>
+        <strong>FireAegis</strong>
         <small>热感智能安防</small>
       </span>
     </a>

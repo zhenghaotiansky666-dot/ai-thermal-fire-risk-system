@@ -120,7 +120,7 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
   const cloudInfo = parseCloudChannel(cloudChannel)
   const pairCode = `TGS-PAIR:${cloudChannel}`.trim()
 
-  // 喇叭页心跳也是 status 事件，但它不属于"用户端上报"，这里滤掉免得刷屏
+  // 系统端自己的 status 心跳不算"用户端上报"，这里滤掉免得刷屏
   const received = events.filter((event) => (event.kind === 'report' || event.kind === 'status') && event.from !== 'speaker')
 
   return (
@@ -156,7 +156,7 @@ export default function LinkSheet({ onClose, latestFire, noticeText }) {
             <input
               type="text"
               value={cloudChannel}
-              placeholder="ntfy:热感哨兵-xxxxx 或 https://你的中继域名"
+              placeholder="ntfy:FireAegis-xxxxx 或 https://你的中继域名"
               onChange={(event) => setCloudChannel(event.target.value)}
             />
           </label>

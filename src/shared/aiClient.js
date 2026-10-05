@@ -152,7 +152,7 @@ export function saveAiSettings(patch) {
 // 两个页面（用户端、系统端）启动时都会调用一次：
 //   1. 读 window.THERMAL_GUARD_AI（脚本注入）；
 //   2. 读站点根目录的 ai-config.json（队友可以直接改文件部署）；
-//   3. 把 window.ThermalGuardAI 暴露出去，队友可以在控制台或自己的脚本里注册能力。
+//   3. 把 window.FireAegisAI 暴露出去，队友可以在控制台或自己的脚本里注册能力。
 export async function bootstrapAiConfig() {
   if (typeof window !== 'undefined' && window.THERMAL_GUARD_AI && typeof window.THERMAL_GUARD_AI === 'object') {
     setExternalAiConfig(window.THERMAL_GUARD_AI)
@@ -272,7 +272,7 @@ export function installVisionBridgeFromSettings() {
   })
 }
 
-// 队友的接入面板：控制台里执行 window.ThermalGuardAI.help() 会打印用法
+// 队友的接入面板：控制台里执行 window.FireAegisAI.help() 会打印用法
 export function installGlobalAiApi() {
   if (typeof window === 'undefined') return null
   const api = {
@@ -294,17 +294,19 @@ export function installGlobalAiApi() {
     command: aiCommand,
     help() {
       console.log([
-        '热感哨兵 · AI 接入接口（v1）',
-        '1) 加推理端点：ThermalGuardAI.registerProvider({ id, label, baseUrl, model, hint })',
-        '2) 接视觉通道：ThermalGuardAI.registerVisionDetector(async ({ frame, image }) => ({ flame: 0.9, smoke: 0.4 }))',
-        '3) 接红外设备：ThermalGuardAI.registerVitalSensor(async () => ({ width: 32, height: 24, temperatures: [...768 个数] }))',
-        '4) 看当前状态：ThermalGuardAI.integrationStatus()',
-        '5) 写入端点配置：ThermalGuardAI.saveSettings({ provider: "ollama", baseUrl: "/ai/v1", model: "qwen2.5:7b" })',
+        'FireAegis · AI 接入接口（v1）',
+        '1) 加推理端点：FireAegisAI.registerProvider({ id, label, baseUrl, model, hint })',
+        '2) 接视觉通道：FireAegisAI.registerVisionDetector(async ({ frame, image }) => ({ flame: 0.9, smoke: 0.4 }))',
+        '3) 接红外设备：FireAegisAI.registerVitalSensor(async () => ({ width: 32, height: 24, temperatures: [...768 个数] }))',
+        '4) 看当前状态：FireAegisAI.integrationStatus()',
+        '5) 写入端点配置：FireAegisAI.saveSettings({ provider: "ollama", baseUrl: "/ai/v1", model: "qwen2.5:7b" })',
       ].join('\n'))
       return integrationStatus()
     },
   }
-  window.ThermalGuardAI = api
+  window.FireAegisAI = api
+  // 兼容旧脚本：改名前文档里写的是 ThermalGuardAI，这里保留一个别名
+  if (!window.FireAegisAI) window.FireAegisAI = api
   return api
 }
 

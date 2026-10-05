@@ -1,4 +1,4 @@
-// 热感哨兵 · Cloudflare Worker 版事件中继（免费额度即可跑）
+// FireAegis · Cloudflare Worker 版事件中继（免费额度即可跑）
 //
 // 部署（约 3 分钟）：
 //   1) npm i -g wrangler && wrangler login

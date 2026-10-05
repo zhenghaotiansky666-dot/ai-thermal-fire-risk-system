@@ -271,7 +271,7 @@ async function serveJoinPage(response, port) {
   }
   const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>扫码加入 · 热感哨兵现场演示</title>
+  <title>扫码加入 · FireAegis 现场演示</title>
   <style>
     body{margin:0;min-height:100vh;background:#06101f;color:#f3f8ff;font-family:-apple-system,"PingFang SC",sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
     main{width:min(760px,100%);display:grid;gap:18px}
@@ -285,7 +285,7 @@ async function serveJoinPage(response, port) {
     code{color:#93c5fd;word-break:break-all;font-size:12px}
     .steps{margin:0;padding-left:18px;color:#8ea5c2;font-size:12px;line-height:1.8}
   </style></head><body><main>
-    <h1>热感哨兵 · 现场演示入口</h1>
+    <h1>FireAegis · 现场演示入口</h1>
     <p>本页由演示电脑（本机）提供，手机连同一个 Wi-Fi/热点后扫码即可进入。<strong>不需要互联网，也不需要装任何 App。</strong></p>
     <div class="cards">
       <section class="card">
@@ -351,7 +351,7 @@ createServer(async (request, response) => {
   }
   await serveStatic(request, response, url.pathname)
 }).listen(port, host, () => {
-  console.log(`热感哨兵本地站点：http://127.0.0.1:${port}/user-app.html （系统端 .../mobile-app.html）`)
+  console.log(`FireAegis 本地站点：http://127.0.0.1:${port}/user-app.html （系统端 .../mobile-app.html）`)
   lanAddresses().forEach((address) => {
     console.log(`  手机端可访问：http://${address}:${port}/user-app.html`)
   })

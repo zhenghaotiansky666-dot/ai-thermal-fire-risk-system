@@ -1,5 +1,5 @@
 // 从队友 957cb3b / 6293377 挑过来的三块功能（巡检、隐患上报、PDF 处置报告），
-// 按我们这一版的风格与数据口径重写：图标、文案、报告抬头改成「热感哨兵」，
+// 按我们这一版的风格与数据口径重写：图标、文案、报告抬头改成「FireAegis」，
 // 巡检记录与隐患记录都只存在本机 localStorage，不依赖后端。
 
 import { useEffect, useRef, useState } from 'react'
@@ -294,7 +294,7 @@ function reportHtml(report) {
   const row = (label, value) => `<tr><td class="k">${label}</td><td>${value}</td></tr>`
   const tone = report.risk === 'high' ? '#dc2626' : report.risk === 'medium' ? '#d97706' : '#16a34a'
   return `
-  <h1>热感哨兵 · 应急处置报告</h1>
+  <h1>FireAegis · 应急处置报告</h1>
   <div class="sub">${report.system} · 生成时间 ${report.generatedAt}</div>
   <h2>一、风险概况</h2><table>
   ${row('检测位置', report.location)}
@@ -313,8 +313,8 @@ function reportHtml(report) {
   <p>立即核查高温区域电源与可燃物，启动声光报警与应急广播，按用户端给出的绿色路线组织疏散，同步拨打 119。持续监测温度趋势，留存全过程证据链，事后在「预警记录」中回溯起火原因与蔓延过程。</p>
   ${report.notes ? `<h2>四、现场记录</h2><p>${report.notes}</p>` : ''}
   <div class="footer">
-    本报告由「热感哨兵」系统自动生成，仅用于科研演示与校内管理，不替代专业消防检测与处置。<br />
-    项目：面向校园与公共建筑的 AI 热感火警预警与动态疏散系统 · 热感哨兵项目组
+    本报告由「FireAegis」系统自动生成，仅用于科研演示与校内管理，不替代专业消防检测与处置。<br />
+    项目：面向校园与公共建筑的 AI 热感火警预警与动态疏散系统 · FireAegis 项目组
   </div>`
 }
 
@@ -363,7 +363,7 @@ export async function exportIncidentPdf(report) {
       remaining -= pageHeight
     }
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
-    pdf.save(`热感哨兵-应急处置报告-${stamp}.pdf`)
+    pdf.save(`FireAegis-应急处置报告-${stamp}.pdf`)
     return true
   } finally {
     holder.remove()
@@ -371,7 +371,7 @@ export async function exportIncidentPdf(report) {
 }
 
 export function openPdfReport(report) {
-  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>热感哨兵 · 应急处置报告</title>
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>FireAegis · 应急处置报告</title>
   <style>body{margin:0;padding:24px;background:#f1f5f9}${REPORT_STYLE}</style></head><body>
   <article class="pdf-report">${reportHtml(report)}</article>
   </body></html>`

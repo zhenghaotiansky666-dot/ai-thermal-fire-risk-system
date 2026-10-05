@@ -9,7 +9,7 @@ import { Crosshair, Flame, MapPin, ShieldAlert, Thermometer } from 'lucide-react
 
 // 演示点位：澳门（含横琴）与香港，真实部署时由设备的 GPS 上报替换
 const DEMO_POINTS = [
-  { id: 'must-p11', name: '澳科大 P11 宿舍', area: '氹仔', lat: 22.1516, lng: 113.5676, risk: 'high', temp: 86.4, hotspots: 3, at: '19:42' },
+  { id: 'must-p11', name: '演示楼 P11', area: '氹仔', lat: 22.1516, lng: 113.5676, risk: 'high', temp: 86.4, hotspots: 3, at: '19:42' },
   { id: 'taipa-old', name: '氹仔旧城区', area: '氹仔', lat: 22.1536, lng: 113.558, risk: 'medium', temp: 52.8, hotspots: 1, at: '16:08' },
   { id: 'lam-ma-tau', name: '黑沙环唐楼群', area: '澳门半岛', lat: 22.2076, lng: 113.552, risk: 'high', temp: 91.2, hotspots: 2, at: '18:25' },
   { id: 'coloane', name: '路环市区旧楼', area: '路环', lat: 22.116, lng: 113.552, risk: 'low', temp: 38.6, hotspots: 0, at: '11:02' },

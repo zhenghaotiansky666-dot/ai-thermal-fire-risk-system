@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#000000" />
-    <title>电脑版指挥端 · 热感哨兵</title>
+    <title>电脑版指挥端 · FireAegis</title>
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
@@ -95,7 +95,7 @@ cd ai-thermal-fire-risk-system
             或者在网址后面加 <code>?monitor=1</code> 直接进监看模式。
             设置会记住，下次打开自动保持。
           </p>
-          <p>火警时整屏会转红并弹出全屏报警卡，与用户端、楼道喇叭同时响应。</p>
+          <p>火警时整屏会转红并弹出全屏报警卡，同时把预警推给用户端。</p>
         </div>
 
         <div class="card">
@@ -103,7 +103,7 @@ cd ai-thermal-fire-risk-system
           <h2>要改硬件参数从这里入手</h2>
           <p>端口、上传路由、终审阈值、固件地址都能改，改完刷新页面即可：</p>
           <ol>
-            <li><code>public/ai-config.json</code> → <code>hardwarePort</code> 改接收端端口（默认 5000，macOS 建议 8787）</li>
+            <li><code>public/ai-config.json</code> → <code>hardwarePort</code> 改接收端端口（默认 8787）、<code>visionUrl</code> 改本地 AI 服务地址（默认 8000）</li>
             <li><code>tools/hardware-receiver.mjs</code> → <code>/upload</code>、<code>/upload_thermal</code> 两个路由与终审顺序</li>
             <li><code>tools/local-ai-server.mjs --hardware-port</code> → 本地服务转发给接收端的端口</li>
             <li>详细步骤见仓库里的 <code>docs/硬件同学-编辑指南.md</code></li>
@@ -114,12 +114,12 @@ cd ai-thermal-fire-risk-system
 
       <div class="note">
         <b>提示：</b>电脑版和手机版共用同一份数据与同一条链路（局域网中继 / 云端通道），
-        所以电脑上报警，手机端与楼道喇叭会同时响应；反过来手机上报火源，电脑这边也会立刻看到。
+        所以电脑上报警，手机端会同时响应；反过来手机上报隐患或火源，电脑这边也会立刻看到。
       </div>
 
       <footer>
         <a class="back" href="./mobile-app.html">← 返回指挥端</a> ·
-        热感哨兵 · AI 热感火警预警与动态疏散系统
+        FireAegis · AI 热感火警预警与动态疏散系统
       </footer>
     </div>
   </body>

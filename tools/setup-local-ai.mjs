@@ -253,7 +253,7 @@ function openBrowser(url) {
 }
 
 export async function main() {
-  console.log('== 热感哨兵 · 本地 AI 一键配置 ==')
+  console.log('== FireAegis · 本地 AI 一键配置 ==')
   console.log(`模型：${model}　端点：${upstream}　站点端口：${sitePort}`)
 
   if (!checkOnly) {

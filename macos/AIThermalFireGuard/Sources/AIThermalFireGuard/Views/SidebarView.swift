@@ -35,7 +35,7 @@ struct SidebarView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("热感哨兵")
+                        Text("FireAegis")
                             .font(.system(size: 15, weight: .bold))
                         Text("AI THERMAL GUARD")
                             .font(.system(size: 7, weight: .semibold))

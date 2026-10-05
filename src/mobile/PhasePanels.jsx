@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { buildNeighborNotice, fusePreventionSignals, summarizeRescueBrief } from '../shared/aiPhases.js'
+import { copilotFromEvidence } from '../shared/offlineCopilot.js'
 import { createAfterFireFrame, describeVitalSigns, scanVitalSigns } from '../shared/vitalSigns.js'
 import { getVitalSensor, getVisionDetector, readVitalFrame, runVisionDetector, subscribeIntegrations } from '../shared/aiHooks.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
@@ -80,6 +81,14 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
   const notice = useMemo(() => buildNeighborNotice(decision, { floor, location: '教学楼' }), [decision, floor])
   const levelText = decision.level === 'alarm' ? '判定火警' : decision.level === 'watch' ? '关注复核' : '监测正常'
 
+  // 队友交付的离线决策树（ai/offline_copilot.c）：用同一组判据回答"这条路还能不能走"。
+  // 它和上面的三路融合是两条独立证据，一条管"要不要报警"，一条管"封不封路"。
+  const copilot = useMemo(() => copilotFromEvidence({
+    thermal: { maxTemp: result?.maxTemp, ror },
+    visual: { smoke: visionSmoke },
+    isBlocked: decision.level === 'alarm' && visionFlame >= 0.75,
+  }), [result?.maxTemp, ror, visionSmoke, visionFlame, decision.level])
+
   const runAiReview = async () => {
     setBusy(true)
     const settings = readAiSettings()
@@ -118,6 +127,12 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
         <p className="situation-note"><Info size={12} />{decision.missing.join('；')}（单路证据不触发报警，避免误报）</p>
       )}
 
+      <div className={`prevention-copilot ${copilot.block ? 'is-block' : 'is-pass'}`}>
+        <Cpu size={13} />
+        <span>离线 AI 决策树 · {copilot.block ? '此路受阻，改走别的通道' : '通道可通行'}</span>
+        <small>{copilot.reason}</small>
+      </div>
+
       <div className={`prevention-demo ${visionChannel.attached ? 'is-attached' : ''}`}>
         {visionChannel.attached && (
           <p className="prevention-channel"><Activity size={12} />视觉通道已接入：火焰 {Math.round(visionFlame * 100)}% · 烟雾 {Math.round(visionSmoke * 100)}%{visionChannel.note ? ` · ${visionChannel.note}` : ''}</p>
@@ -136,7 +151,7 @@ export function PreventionPanel({ result, thresholds, history = [], floor = 4, o
           <Info size={12} />
           {visionChannel.attached
             ? '火焰与烟雾置信度来自队友接入的视觉通道。'
-            : '火焰与烟雾置信度在真实部署里由摄像头视觉模型给出：队友可调用 ThermalGuardAI.registerVisionDetector() 接入，未接入时用滑杆演示"单路不报警、三路才确认"。'}
+            : '火焰与烟雾置信度在真实部署里由摄像头视觉模型给出：队友可调用 FireAegisAI.registerVisionDetector() 接入，未接入时用滑杆演示"单路不报警、三路才确认"。'}
         </p>
       </div>
 
@@ -322,7 +337,7 @@ export function VitalSignsPanel({ floor = 4, aiSettings }) {
         <Info size={12} />
         {sensorAttached
           ? '热像来自接入的红外设备。'
-          : '当前用模拟灾后帧演示：队友可调用 ThermalGuardAI.registerVitalSensor() 接入真实红外设备。'}
+          : '当前用模拟灾后帧演示：队友可调用 FireAegisAI.registerVitalSensor() 接入真实红外设备。'}
         红外只能看到表面温度：被遮挡、被掩埋的人员看不到，算法结果只作为搜救辅助，必须人工复核。
       </p>
     </section>

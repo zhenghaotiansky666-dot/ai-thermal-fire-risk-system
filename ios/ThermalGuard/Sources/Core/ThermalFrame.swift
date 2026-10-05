@@ -153,7 +153,7 @@ struct AlarmPoint: Identifiable {
     let time: String
 
     static let demo: [AlarmPoint] = [
-        AlarmPoint(id: "must-p11", name: "澳科大 P11 宿舍", area: "氹仔", latitude: 22.1516, longitude: 113.5676, risk: .high, temperature: 86.4, hotspots: 3, time: "19:42"),
+        AlarmPoint(id: "must-p11", name: "演示楼 P11", area: "氹仔", latitude: 22.1516, longitude: 113.5676, risk: .high, temperature: 86.4, hotspots: 3, time: "19:42"),
         AlarmPoint(id: "taipa-old", name: "氹仔旧城区", area: "氹仔", latitude: 22.1536, longitude: 113.5580, risk: .medium, temperature: 52.8, hotspots: 1, time: "16:08"),
         AlarmPoint(id: "lam-ma-tau", name: "黑沙环唐楼群", area: "澳门半岛", latitude: 22.2076, longitude: 113.5520, risk: .high, temperature: 91.2, hotspots: 2, time: "18:25"),
         AlarmPoint(id: "coloane", name: "路环市区旧楼", area: "路环", latitude: 22.1160, longitude: 113.5520, risk: .low, temperature: 38.6, hotspots: 0, time: "11:02"),

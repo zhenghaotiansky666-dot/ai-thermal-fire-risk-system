@@ -143,21 +143,21 @@ export function buildNeighborNotice(decision, context = {}) {
   const conf = decision?.confidence != null ? `${Math.round(decision.confidence * 100)}%` : null
 
   if (!decision || decision.level === 'normal') {
-    return `【热感哨兵】${place}监测正常，暂无需撤离。如闻到焦糊味请立即告知值班人员。`
+    return `【FireAegis】${place}监测正常，暂无需撤离。如闻到焦糊味请立即告知值班人员。`
   }
   if (decision.level === 'watch') {
     const why = [
       Number.isFinite(temp) ? `检测到局部升温至 ${temp.toFixed(0)}°C` : '检测到升温迹象',
       decision.evidence?.smoke?.smokeSeen ? '伴有烟雾特征' : null,
     ].filter(Boolean).join('，')
-    return `【热感哨兵】${place}${why}，正在复核，请周边人员暂时远离该区域、保持通道畅通。`
+    return `【FireAegis】${place}${why}，正在复核，请周边人员暂时远离该区域、保持通道畅通。`
   }
   const what = [
     Number.isFinite(temp) ? `温度 ${temp.toFixed(0)}°C` : null,
     decision.evidence?.visual?.flameSeen ? '已识别明火' : null,
     decision.evidence?.smoke?.smokeSeen ? '伴有烟雾' : null,
   ].filter(Boolean).join('、')
-  return `【热感哨兵】${place}确认火情${what ? `（${what}）` : ''}${conf ? `，判定置信度 ${conf}` : ''}。请立即沿最近的安全出口撤离，不要乘坐电梯，不要返回取物；等待疏散指引的请联系现场负责人。`
+  return `【FireAegis】${place}确认火情${what ? `（${what}）` : ''}${conf ? `，判定置信度 ${conf}` : ''}。请立即沿最近的安全出口撤离，不要乘坐电梯，不要返回取物；等待疏散指引的请联系现场负责人。`
 }
 
 // ---------------------------------------------------------------- 阶段二：逃生与救援

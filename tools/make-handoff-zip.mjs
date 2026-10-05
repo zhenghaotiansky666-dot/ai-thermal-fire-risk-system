@@ -1,7 +1,7 @@
 // 打包"队友运行包"：预构建站点 + 一键脚本 + YOLO 服务模板（不含 node_modules / 源码构建链）。
 //
 // 用法：node tools/make-handoff-zip.mjs [输出目录]
-// 产物：热感哨兵-队友运行包-<日期>.zip
+// 产物：FireAegis-队友运行包-<日期>.zip
 
 import { chmod, cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -12,7 +12,7 @@ import { promisify } from 'node:util'
 const run = promisify(execFile)
 const outDir = resolve(process.argv[2] || 'outputs')
 const stamp = new Date().toISOString().slice(0, 10)
-const packageName = `热感哨兵-队友运行包-${stamp}`
+const packageName = `FireAegis-队友运行包-${stamp}`
 const stage = resolve('.handoff-stage', packageName)
 
 const FILES = [
@@ -28,7 +28,7 @@ const DIRS = [
   ['firmware', 'firmware'],
 ]
 
-const README = `热感哨兵 · 队友运行包（${stamp}）
+const README = `FireAegis · 队友运行包（${stamp}）
 ========================================
 
 这个包是"拿来就能跑"的版本：站点已经构建好，不需要联网装依赖、不需要编译。

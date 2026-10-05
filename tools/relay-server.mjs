@@ -1,4 +1,4 @@
-// 热感哨兵 · 云端事件中继（自建最小实现）
+// FireAegis · 云端事件中继（自建最小实现）
 //
 // 用途：把「用户端 → 系统端」的消息放到公网服务器上，住户手机用 4G/5G 就能收到，
 // 不依赖任何局域网、热点或蓝牙。这一版是单文件实现，方便直接扔到 Vercel / Render /
@@ -152,6 +152,6 @@ createServer(async (request, response) => {
 
   json(404, { ok: false, error: 'not-found', hint: '可用端点：GET /health、POST /events、GET /events?since=' })
 }).listen(port, '0.0.0.0', () => {
-  console.log(`热感哨兵云端中继已启动：http://127.0.0.1:${port}`)
+  console.log(`FireAegis 云端中继已启动：http://127.0.0.1:${port}`)
   console.log('前端「云端通道」填这个地址（不带路径）。生产部署请套 HTTPS 反向代理。')
 })

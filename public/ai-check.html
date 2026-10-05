@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#06101F" />
-  <title>AI 接入自检｜热感哨兵</title>
+  <title>AI 接入自检｜FireAegis</title>
   <style>
     :root { color-scheme: dark; --bg:#06101f; --panel:rgba(21,38,64,.9); --line:rgba(96,165,250,.22); --text:#f3f8ff; --muted:#8ea5c2; --blue:#3b82f6; --cyan:#38bdf8; --green:#22c55e; --red:#ef4444; --amber:#f59e0b; }
     * { box-sizing:border-box; }
@@ -262,7 +262,7 @@
   })
 
   document.getElementById('copy').addEventListener('click', async () => {
-    const text = `【热感哨兵 AI 自检】\n端点：${endpointInput.value || '未填'}\n模型：${modelInput.value || '未填'}\n页面：${location.href}\n\n${lastSummary || '（还没测试）'}`
+    const text = `【FireAegis AI 自检】\n端点：${endpointInput.value || '未填'}\n模型：${modelInput.value || '未填'}\n页面：${location.href}\n\n${lastSummary || '（还没测试）'}`
     try {
       await navigator.clipboard.writeText(text)
       document.getElementById('copy').textContent = '已复制'

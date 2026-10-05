@@ -200,8 +200,14 @@ export function connectGateway(url = readGatewayUrl()) {
       emit()
     }
     socket.onerror = () => {
-      state.status = state.status === 'connected' ? 'connected' : 'failed'
+      const wasConnected = state.status === 'connected'
+      state.status = wasConnected ? 'connected' : 'failed'
       state.error = '连接出错（检查网关是否在跑、地址与端口是否正确）'
+      if (!wasConnected) {
+        // 连不上网关时把视觉通道还给"设置里的 YOLO 服务"，别让它一直空着
+        registerVisionDetector(null)
+        installVisionBridgeFromSettings()
+      }
       emit()
     }
     socket.onclose = () => {

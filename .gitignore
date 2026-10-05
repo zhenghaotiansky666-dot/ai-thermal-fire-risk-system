@@ -9,3 +9,9 @@ qa-*.png
 *.xcuserstate
 .tools/
 build/
+
+# 本地 AI 虚拟环境（不提交）
+ai/.venv/
+
+# Python 缓存 / 虚拟环境
+__pycache__/

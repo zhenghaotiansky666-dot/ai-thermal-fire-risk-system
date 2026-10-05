@@ -5,7 +5,7 @@
 cd "$(dirname "$0")" || exit 1
 
 echo "=============================================="
-echo " 热感哨兵 · 本地 AI 一键配置（macOS）"
+echo " FireAegis · 本地 AI 一键配置（macOS）"
 echo "=============================================="
 
 if ! command -v node >/dev/null 2>&1; then

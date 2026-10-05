@@ -100,7 +100,7 @@ export default function AiCommandSheet({ onClose, onSaved }) {
       baseUrl: diagnose?.hints?.endpointForBrowser || form.baseUrl || '/ai/v1',
       model,
       vision: Boolean(form.vision),
-      label: '热感哨兵 AI',
+      label: 'FireAegis AI',
     })
     setPairUrl(url)
     try {
@@ -346,7 +346,7 @@ export default function AiCommandSheet({ onClose, onSaved }) {
             <li>红外设备（阶段三热像源）：{status.vital ? '已接入' : '未接入（用模拟灾后帧）'}</li>
             <li>额外端点预设：{status.providers.length ? status.providers.join('、') : '无'}</li>
           </ul>
-          <span>在控制台执行 <code>ThermalGuardAI.help()</code> 可以看到接入写法；也可以直接改站点根目录的 <code>ai-config.json</code>。</span>
+          <span>在控制台执行 <code>FireAegisAI.help()</code> 可以看到接入写法；也可以直接改站点根目录的 <code>ai-config.json</code>。</span>
         </div>
 
         <div className="sheet-tip protocol-tip">

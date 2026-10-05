@@ -17,17 +17,17 @@ const APPS = [
   {
     id: 'user',
     label: '逃生指引',
-    name: '热感哨兵 · 逃生指引',
+    name: 'FireAegis · 逃生指引',
     url: `${base}/user-app.html`,
-    file: '热感哨兵-用户端-安装.mobileconfig',
+    file: 'FireAegis-用户端-安装.mobileconfig',
     qr: 'qr-user.svg',
   },
   {
     id: 'system',
-    label: '热感哨兵',
-    name: '热感哨兵 · 系统端',
+    label: 'FireAegis',
+    name: 'FireAegis · 系统端',
     url: `${base}/mobile-app.html`,
-    file: '热感哨兵-系统端-安装.mobileconfig',
+    file: 'FireAegis-系统端-安装.mobileconfig',
     qr: 'qr-system.svg',
   },
 ]
@@ -90,9 +90,9 @@ ${iconBase64}
   <key>PayloadDisplayName</key>
   <string>${app.name} 安装配置</string>
   <key>PayloadDescription</key>
-  <string>热感哨兵 ${app.label} 的网页应用快捷方式（不修改系统设置、不采集任何信息）。</string>
+  <string>FireAegis ${app.label} 的网页应用快捷方式（不修改系统设置、不采集任何信息）。</string>
   <key>PayloadOrganization</key>
-  <string>澳门科技大学 · 热感哨兵</string>
+  <string>FireAegis 项目组</string>
   <key>PayloadRemovalDisallowed</key>
   <false/>
 </dict>

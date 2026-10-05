@@ -66,13 +66,14 @@ import AiCommandSheet from './AiCommandSheet.jsx'
 import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdfReport } from './EmergencyPanels.jsx'
 import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from './PhasePanels.jsx'
 import HardwareFeed from './HardwareFeed.jsx'
-import SpeakerPanel from './SpeakerPanel.jsx'
 import AiGatewayPanel from './AiGatewayPanel.jsx'
 import LinkedReportsPanel from './LinkedReportsPanel.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { aiStatus, autoDiscoverAi, subscribeAiStatus } from '../shared/aiClient.js'
 import { autoConnectGateway } from '../shared/aiGateway.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
+// 把硬件帧写进用户端的遥测通道（多传感器定位 / 离线决策树的输入）
+import { KEYS, writeJson } from '../user/sensors.js'
 import LinkSheet from './LinkSheet.jsx'
 import { createEvent, fireFromEvent, peerReportSummary, sharedEventBus } from '../shared/eventBus.js'
 import CityMap from './CityMap.jsx'
@@ -404,7 +405,7 @@ function AlertsPage({ alerts, onToast }) {
                 : alerts.some((item) => item.risk === 'medium') ? 'medium' : 'low'
               const maxTemp = Math.max(...alerts.map((item) => Number(item.temp) || 0))
               return {
-                system: '热感哨兵 · 系统端',
+                system: 'FireAegis · 系统端',
                 generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
                 location: '校园数字孪生 · 检测日志汇总',
                 risk: worst,
@@ -1128,7 +1129,7 @@ export default function MobileApp() {
 
   // 处置报告（导出为 PDF）：把当前这一刻的判定、路线与人流写进同一份报告
   const buildIncidentReport = () => ({
-    system: '热感哨兵 · AI 火警预警与动态疏散系统',
+    system: 'FireAegis · AI 火警预警与动态疏散系统',
     generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     location: fireLocationDetail || alarm?.location || '校园数字孪生',
     risk: alarm?.risk || resultRisk,
@@ -1531,17 +1532,23 @@ export default function MobileApp() {
     if (activeTab === 'camera') {
       return (
         <>
-          <SpeakerPanel
-            fire={fire}
-            fireText={fireLocationDetail ? `${fireLocationDetail} 发生火情` : ''}
-            onToast={setToast}
-          />
           <AiGatewayPanel onToast={setToast} />
           <HardwareFeed
             onFrame={(nextFrame) => {
               // 硬件热像接入检测链路：帧结构一致，报警阈值/危险场/疏散自动复用
               setFrame(nextFrame)
               setResult(nextFrame)
+            }}
+            onThermal={(thermal) => {
+              // 每帧热像都写进遥测通道：用户端据此做多传感器定位，
+              // 也是队友那套离线决策树（温度 > 60°C 封路）的输入。
+              const temp = Number(thermal?.maxTemp)
+              if (!Number.isFinite(temp)) return
+              const nodeId = fire?.nodeId || 'C4'
+              writeJson(KEYS.telemetry, {
+                at: Date.now(),
+                nodes: [{ id: 'hardware', nodeId, floor: BUILDING?.nodes?.[nodeId]?.floor ?? fire?.floor ?? 4, temp }],
+              })
             }}
           />
           <CameraPage cameras={cameras} selectedCamera={selectedCamera} frame={frame} connection={connection} onSelect={(camera) => setSelectedCameraId(camera.id)} onAdd={() => setCameraSheet({ camera: null })} onEdit={(camera) => setCameraSheet({ camera })} onDelete={(id) => { setCameras((current) => current.filter((camera) => camera.id !== id)); if (selectedCameraId === id) setSelectedCameraId(cameras.find((camera) => camera.id !== id)?.id || '') }} canShare={Boolean(selectedCamera?.public)} onShare={shareCamera} />
@@ -1661,7 +1668,7 @@ export default function MobileApp() {
         </div>
       )}
       <header className={`mobile-topbar ${scrolled ? 'is-scrolled' : ''}`}>
-        <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>热感哨兵</strong><small>AI火警网警</small></div></div>
+        <div className="mobile-brand"><span><Flame size={19} /></span><div><strong>FireAegis</strong><small>AI火警网警</small></div></div>
         <span className="nav-title">
           {activeTab === 'alerts'
             ? (alertSection === 'settings' ? '报警设置' : '预警记录')

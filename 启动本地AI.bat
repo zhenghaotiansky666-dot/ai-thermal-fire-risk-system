@@ -5,7 +5,7 @@ rem 双击即可运行（Windows）：检查环境 → 一键配置本地 AI →
 cd /d "%~dp0"
 
 echo ==============================================
-echo  热感哨兵 · 本地 AI 一键配置（Windows）
+echo  FireAegis · 本地 AI 一键配置（Windows）
 echo ==============================================
 
 where node >nul 2>nul

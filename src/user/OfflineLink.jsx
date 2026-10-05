@@ -156,7 +156,7 @@ export default function OfflineLink({ floor, spot, nearestExit, onImportEvent, o
         <input
           type="text"
           value={cloudChannel}
-          placeholder="ntfy:热感哨兵-xxxxx 或 https://你的中继域名"
+          placeholder="ntfy:FireAegis-xxxxx 或 https://你的中继域名"
           onChange={(event) => setCloudChannel(event.target.value)}
         />
       </label>

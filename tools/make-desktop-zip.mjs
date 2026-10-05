@@ -1,7 +1,7 @@
 // 打包"电脑版"：预构建站点 + 一键启动器 + 本地服务 + 硬件接收端 + 编辑指南。
 //
 // 用法：node tools/make-desktop-zip.mjs [输出目录]
-// 产物：热感哨兵-电脑版-<日期>.zip
+// 产物：FireAegis-电脑版-<日期>.zip
 //
 // 与"队友运行包"的区别：这个包是给**要在电脑上长期监看、并且可能要改硬件参数**的人用的，
 // 所以带上启动电脑版的脚本（独立窗口 + 监看模式）和 docs/ 里的硬件编辑指南。
@@ -15,7 +15,7 @@ import { promisify } from 'node:util'
 const run = promisify(execFile)
 const outDir = resolve(process.argv[2] || 'outputs')
 const stamp = new Date().toISOString().slice(0, 10)
-const packageName = `热感哨兵-电脑版-${stamp}`
+const packageName = `FireAegis-电脑版-${stamp}`
 const stage = resolve('.desktop-stage', packageName)
 
 const FILES = [
@@ -32,7 +32,7 @@ const DIRS = [
   ['firmware', 'firmware'],
 ]
 
-const README = `热感哨兵 · 电脑版（${stamp}）
+const README = `FireAegis · 电脑版（${stamp}）
 ========================================
 
 这个包是"放在电脑上监看"的版本：站点已经构建好，双击启动器就能跑，

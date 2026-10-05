@@ -5,20 +5,23 @@
 //   POST /upload_thermal  JSON {max_temp, sensor_data:[768]}（固件 thermalServerUrl）
 // 页面通过同源 /hw/* 代理读取（HTTPS 页面不能直接访问 http://host:5000）
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Activity, Camera, Cpu, Flame, Link2, RefreshCw, Wifi } from 'lucide-react'
 import { frameFromMatrix } from './thermal.js'
 import { describeFreshness } from '../shared/freshness.js'
 
 const POLL_MS = 2000
 
-export default function HardwareFeed({ onFrame }) {
+export default function HardwareFeed({ onFrame, onThermal }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
   const [online, setOnline] = useState(null)
   const [drive, setDrive] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  // 外面传进来的回调每次都可能是新的函数，用 ref 存住，避免每帧重复触发
+  const thermalRef = useRef(onThermal)
+  useEffect(() => { thermalRef.current = onThermal }, [onThermal])
 
   useEffect(() => {
     let cancelled = false
@@ -46,6 +49,12 @@ export default function HardwareFeed({ onFrame }) {
       window.clearInterval(clock)
     }
   }, [tick])
+
+  // 每来一帧新的热像就通知外面一次（写遥测通道用），和"是否用硬件驱动检测"无关
+  useEffect(() => {
+    if (!data?.thermal) return
+    thermalRef.current?.(data.thermal)
+  }, [data?.thermal?.at])
 
   // 「用硬件热像驱动检测」：把 MLX90640 上传的矩阵变成系统统一帧，
   // 于是三维热感板、报警阈值、危险场与疏散算法全部用真实传感器数据（而不是模拟器）

@@ -1,4 +1,4 @@
-# 热感哨兵 · Android 安装包（TWA 工程）
+# FireAegis · Android 安装包（TWA 工程）
 
 这个目录把网页版打包成**安卓 APK / AAB**（Google 官方的 Trusted Web Activity 方式：
 一个真正的 App，全屏打开我们的站点，内容与 PWA 完全一致）。

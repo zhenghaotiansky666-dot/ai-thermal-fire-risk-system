@@ -16,7 +16,7 @@ function check(name, condition, detail = '') {
 
 console.log('[1] 配对码编解码')
 {
-  const code = encodeAiPairing({ baseUrl: 'http://192.168.1.20:11434/v1', model: 'qwen2.5:7b', vision: true, label: '热感哨兵 AI' })
+  const code = encodeAiPairing({ baseUrl: 'http://192.168.1.20:11434/v1', model: 'qwen2.5:7b', vision: true, label: 'FireAegis AI' })
   check('生成的是 URL 安全字符串', !/[\s+/=]/.test(code))
   const back = decodeAiPairing(code)
   check('往返一致（端点）', back.baseUrl === 'http://192.168.1.20:11434/v1')

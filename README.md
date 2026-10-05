@@ -1,4 +1,4 @@
-# AI热感火警风险检测系统
+# FireAegis · AI 热感火警预警与动态疏散系统
 
 基于热成像与计算机视觉的早期火灾预警科研演示原型。
 
@@ -6,7 +6,25 @@
 
 网站通过 GitHub Pages 自动发布：
 
-https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/
+https://zhenghaotiansky666-dot.github.io/ai-thermal-fire-risk-system/
+
+## AI 接入（本地 AI 模块）
+
+队友交付的 AI 模块在 **`ai/`**：YOLOv8 火焰/烟雾权重 + 一个离线决策树（导出成 C 代码）。
+我们补齐了前端要用的接口，并做了两个端的接线：
+
+```bash
+pip3 install -r ai/requirements.txt
+python3 ai/server.py --model ai/yolov8n.pt --port 8000
+# 也可以直接双击 启动AI视觉.command（macOS）/ 启动AI视觉.bat（Windows）
+```
+
+- **视觉通道**：系统端「检测」页阶段一显示 `视觉通道已接入：火焰 xx% · 烟雾 xx%`，
+  `public/ai-config.json` 已默认指向 `http://127.0.0.1:8000`，打开系统端会自动探测并接上；
+- **离线决策树**：`src/shared/offlineCopilot.js` 与 `ai/offline_copilot.c` 判据逐行一致
+  （温度 > 60°C 或烟雾越线 → 封路），用户端据此自动改走另一条出口，系统端阶段一并列显示结论。
+
+**ai/README.md** —— 接口说明（`/health`、`/predict`、`/detect`）、权重替换、决策树规则。
 
 ## 电脑版指挥端（大屏监看）
 
@@ -22,7 +40,7 @@ https://roubizhao6-sys.github.io/ai-thermal-fire-risk-system/
 打包成压缩包分发：
 
 ```bash
-node tools/make-desktop-zip.mjs outputs     # 产出 热感哨兵-电脑版-<日期>.zip
+node tools/make-desktop-zip.mjs outputs     # 产出 FireAegis-电脑版-<日期>.zip
 ```
 
 ## 给队友的编辑指南

@@ -1,7 +1,7 @@
 {
-  "_readme": "热感哨兵 · AI 接入配置（给部署的同学用）。放在站点根目录即可，界面里保存过的设置优先级更高。",
+  "_readme": "FireAegis · AI 接入配置（给部署的同学用）。放在站点根目录即可，界面里保存过的设置优先级更高。",
   "_fields": {
-    "provider": "offline | ollama | lmstudio | vllm | custom",
+    "provider": "offline | ollama | lmstudio | vllm | custom（决策对话模型；只跑 YOLO 时保持 offline，走本机规则引擎）",
     "baseUrl": "OpenAI 兼容端点，本地部署推荐相对路径 /ai/v1（配合 node tools/local-ai-server.mjs）",
     "model": "模型名，例如 qwen2.5:7b；读图用 qwen2.5-vl:7b",
     "vision": "该模型是否支持读图（用于复核用户上传的疏散路线图）",
@@ -12,14 +12,17 @@
     "apiKey": "本地端点留空；云端服务才需要",
     "cloudChannel": "两边互通用的警报频道。原型可填 ntfy:主题名；部署了自己的中继就填 https://你的域名#分组名",
     "areaChannels": "区域频道表（可选）：[{ id, label, channel, lat, lon, radiusMeters }]，用于“走到附近自动订阅”",
-    "hardwarePort": "硬件接收端端口（ESP32-S3 上传可见光/热像）。macOS 默认 8787（5000 被系统隔空播放占用），Windows 默认 5000；改端口时记得同步改固件两行地址"
+    "hardwarePort": "硬件接收端端口（ESP32-S3 上传可见光/热像）。全平台默认 8787；改端口时记得同步改固件两行地址"
   },
   "provider": "offline",
   "baseUrl": "",
   "model": "",
   "vision": false,
+  "visionUrl": "http://127.0.0.1:8000",
+  "visionModel": "yolov8n.pt",
+  "visionConf": 0.25,
   "apiKey": "",
   "cloudChannel": "",
   "hardwarePort": 8787,
-  "_notes": "改成实际端点后保存即可。示例：{ \"provider\": \"ollama\", \"baseUrl\": \"/ai/v1\", \"model\": \"qwen2.5:7b\" }"
+  "_notes": "视觉通道默认指向队友交付的本地 AI 服务（ai/server.py，跑在 8000，权重 ai/yolov8n.pt）。系统端打开会自动探测 8000/8080 并接上；决策层没配对话模型时用本机规则引擎，不影响报警与疏散。"
 }
