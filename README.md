@@ -67,6 +67,27 @@ node tools/hardware-receiver.mjs --print-firmware --interface en5     # 指定�
 **docs/软件方向介绍（PPT素材）.md** —— 系统端六大模块、三阶段 AI 决策链、
 用户端三步使用流程与便捷性设计，附建议截图清单。
 
+## 用户端联动（隐患照片 / 求助上报 → 系统端）
+
+用户端「更多 → 隐患上报」拍照 + 描述提交后，系统端「看板 → 用户端联动」会收到
+照片、位置与时间；用户端自救问答的求助结果同样汇总过去。两条链路自动选：
+
+- **同一设备**：两端共用 `thermalGuardHazards` / `thermalGuardUserStatus`，跨标签页即时可见；
+- **跨设备**：走本仓库已有的三级事件总线（局域网中继 → ntfy/自建中继 → 离线码），
+  用户端扫码加入演练后手机上拍的照片会同步到系统端；
+- 走公网 ntfy 时照片先当附件上传、事件里只带链接（消息体只有 4KB，塞不下图）。
+
+逻辑在 `src/shared/userReports.js`（纯函数，有单测 `tests/userReports.test.mjs`），
+面板在 `src/mobile/LinkedReportsPanel.jsx`。
+
+## 大模型免 Key 代理（可选）
+
+`gateway/llm-proxy/` 是一个 Cloudflare Worker：把大模型 API Key 放在服务端，
+线上静态站点只填代理地址，用户看不到 Key。接口与 OpenAI `/chat/completions` 同构，
+直接把 AI 指挥的端点地址填成 Worker 地址即可，不用改前端代码。
+
+**gateway/llm-proxy/README.md** —— 部署命令、`LLM_API_KEY` / `PROXY_TOKEN` 配置、切换服务商。
+
 ## 功能
 
 - 热成像图片上传、拖拽与本地预览

@@ -68,6 +68,7 @@ import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from '
 import HardwareFeed from './HardwareFeed.jsx'
 import SpeakerPanel from './SpeakerPanel.jsx'
 import AiGatewayPanel from './AiGatewayPanel.jsx'
+import LinkedReportsPanel from './LinkedReportsPanel.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { aiStatus, autoDiscoverAi, subscribeAiStatus } from '../shared/aiClient.js'
 import { autoConnectGateway } from '../shared/aiGateway.js'
@@ -751,6 +752,7 @@ function DashboardPage({ onOpenAbout }) {
       <div className="dashboard-grid">{stats.map(([label, value, unit, change, Icon, tone]) => <article className={`dashboard-stat tone-${tone}`} key={label}><span><Icon size={16} /></span><p>{label}</p><strong>{value}<small>{unit}</small></strong><em>{change}</em></article>)}</div>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>风险趋势</strong><small>近30日最高温度预警指数</small></div><TrendingUp size={18} /></div><LineChart /></section>
       <section className="mobile-card chart-card"><div className="card-head"><div><strong>隐患类型分布</strong><small>高频隐患分类统计</small></div><BarChart3 size={18} /></div><div className="bar-chart">{[['电气过热', 72], ['设备异常', 58], ['环境温升', 44], ['线路老化', 31], ['其他', 26]].map(([label, value], index) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${value}%`, '--bar-delay': `${index * 90}ms` }} /></div><b>{value}</b></div>)}</div></section>
+      <LinkedReportsPanel />
       <div className="dashboard-note"><Activity size={16} />数据用于隐患识别、巡检优先级排序和风险治理优化。</div>
       {onOpenAbout && (
         <button className="disclosure-row" type="button" onClick={onOpenAbout}>

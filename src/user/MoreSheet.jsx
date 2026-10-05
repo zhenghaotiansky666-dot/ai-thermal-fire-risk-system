@@ -1,9 +1,20 @@
-// 「更多」面板：逃生路线图（上传 / 识别 / 本地保存）、AI 指挥设置、端切换入口。
+// 「更多」面板：逃生路线图（上传 / 识别 / 本地保存）、隐患上报、AI 指挥设置、端切换入口。
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cpu, DoorOpen, Image as ImageIcon, Link2, Radio, Save, Sparkles, Trash2, Upload } from 'lucide-react'
+import {
+  AlertTriangle, Camera, CheckCircle2, Cpu, DoorOpen, Image as ImageIcon,
+  Link2, Radio, Save, Smartphone, Sparkles, Trash2, Upload, X,
+} from 'lucide-react'
 import { aiReachable, listAiProviders, providerPreset } from '../shared/aiClient.js'
 import { integrationStatus } from '../shared/aiHooks.js'
+import { sharedEventBus } from '../shared/eventBus.js'
+import {
+  addHazard,
+  publishHazard,
+  readHazards,
+  readPhotoFile,
+  removeHazard,
+} from '../shared/userReports.js'
 import {
   aiReviewPlan,
   analyzePlanImage,
@@ -35,8 +46,15 @@ export default function MoreSheet({
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [probe, setProbe] = useState(null)
+  const [hazards, setHazards] = useState(() => readHazards())
+  const [hazardDesc, setHazardDesc] = useState('')
+  const [hazardLoc, setHazardLoc] = useState('')
+  const [hazardImg, setHazardImg] = useState('')
+  const [hazardBusy, setHazardBusy] = useState('')
+  const [hazardNotice, setHazardNotice] = useState('')
   const fileRef = useRef(null)
   const imageRef = useRef(null)
+  const hazardFileRef = useRef(null)
 
   const savedActive = useMemo(
     () => plans.find((plan) => plan.id === activePlanId) ?? plans.find((plan) => plan.floor === floor) ?? null,
@@ -48,6 +66,65 @@ export default function MoreSheet({
     const timer = window.setTimeout(() => setNotice(''), 3600)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (!hazardNotice) return undefined
+    const timer = window.setTimeout(() => setHazardNotice(''), 3600)
+    return () => window.clearTimeout(timer)
+  }, [hazardNotice])
+
+  // 隐患照片：选完立刻压小，既省流量也避免上报时卡住
+  const onPickHazardPhoto = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setHazardBusy('photo')
+    try {
+      const dataUrl = await readPhotoFile(file)
+      setHazardImg(dataUrl)
+    } catch {
+      setHazardNotice('照片读取失败，可以只填文字描述')
+    } finally {
+      setHazardBusy('')
+    }
+  }
+
+  const submitHazard = async () => {
+    if (!hazardDesc.trim() && !hazardImg) {
+      setHazardNotice('至少写一句描述或拍一张照片')
+      return
+    }
+    setHazardBusy('submit')
+    const record = {
+      id: `hz-${Date.now()}`,
+      desc: hazardDesc.trim() || '未描述',
+      loc: hazardLoc.trim() || `${floor} 楼${spot === 'A' ? 'A 梯' : spot === 'B' ? 'B 梯' : '走廊'}`,
+      img: hazardImg,
+      floor,
+      spot,
+      at: Date.now(),
+      from: 'user',
+    }
+    setHazards(addHazard(record))
+    setHazardDesc('')
+    setHazardLoc('')
+    setHazardImg('')
+    try {
+      const bus = sharedEventBus()
+      bus.start()
+      await publishHazard(bus, record)
+      setHazardNotice('已上报，系统端会收到这条隐患')
+    } catch {
+      setHazardNotice('已存在本机，网络恢复后可在系统端同机查看')
+    } finally {
+      setHazardBusy('')
+    }
+  }
+
+  const deleteHazard = (id) => {
+    setHazards(removeHazard(id))
+    setHazardNotice('已删除')
+  }
 
   const aiConfigured = aiSettings.provider !== 'offline' && Boolean(aiSettings.baseUrl)
 
@@ -194,6 +271,9 @@ export default function MoreSheet({
           <button type="button" role="tab" aria-selected={tab === 'plan'} className={tab === 'plan' ? 'active' : ''} onClick={() => setTab('plan')}>
             <DoorOpen size={15} /> 逃生路线图
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'report'} className={tab === 'report' ? 'active' : ''} onClick={() => setTab('report')}>
+            <Camera size={15} /> 隐患上报
+          </button>
           <button type="button" role="tab" aria-selected={tab === 'ai'} className={tab === 'ai' ? 'active' : ''} onClick={() => setTab('ai')}>
             <Cpu size={15} /> AI 指挥
           </button>
@@ -206,6 +286,73 @@ export default function MoreSheet({
         </div>
 
         {notice && <div className="more-notice">{notice}</div>}
+
+        {tab === 'report' && (
+          <div className="more-body">
+            <p className="more-hint">
+              看到楼道堆物、线路发热、消防通道被占用，拍一张照片就能报到系统端；
+              值守人员在数据看板的「用户端联动」里能直接看到照片与位置，不用打电话描述。
+            </p>
+
+            <div className="hazard-form">
+              <button type="button" className="hazard-photo-pick" onClick={() => hazardFileRef.current?.click()} disabled={hazardBusy === 'photo'}>
+                {hazardImg
+                  ? <img src={hazardImg} alt="待上报的隐患照片" />
+                  : <><Camera size={20} /><span>{hazardBusy === 'photo' ? '正在处理照片…' : '拍照 / 选照片'}</span></>}
+              </button>
+              {hazardImg && (
+                <button type="button" className="hazard-photo-clear" onClick={() => setHazardImg('')} aria-label="移除照片">
+                  <X size={14} />
+                </button>
+              )}
+              <input ref={hazardFileRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={onPickHazardPhoto} />
+
+              <input
+                type="text"
+                value={hazardLoc}
+                onChange={(event) => setHazardLoc(event.target.value)}
+                placeholder={`隐患位置（默认：${floor} 楼${spot === 'A' ? 'A 梯' : spot === 'B' ? 'B 梯' : '走廊'}）`}
+              />
+              <textarea
+                rows={2}
+                value={hazardDesc}
+                onChange={(event) => setHazardDesc(event.target.value)}
+                placeholder="隐患描述，例如：三楼配电箱旁线路发热、堆放纸箱"
+              />
+              <div className="more-actions">
+                <button type="button" className="more-primary" onClick={submitHazard} disabled={hazardBusy === 'submit'}>
+                  <Upload size={15} /> {hazardBusy === 'submit' ? '正在上报…' : '上报到系统端'}
+                </button>
+              </div>
+            </div>
+
+            {hazardNotice && <div className="more-notice">{hazardNotice}</div>}
+
+            <div className="hazard-list">
+              <div className="hazard-list-head">
+                <strong>本机上报记录</strong>
+                <span>{hazards.length} 条</span>
+              </div>
+              {hazards.length === 0 && <p className="more-hint">还没有上报记录。上报后会保存在本机，火警时系统端也能看到。</p>}
+              {hazards.map((item) => (
+                <div className="hazard-row" key={item.id}>
+                  {item.img
+                    ? <img src={item.img} alt="隐患照片" />
+                    : <span className="hazard-row-icon"><AlertTriangle size={15} /></span>}
+                  <div>
+                    <strong>{item.loc}</strong>
+                    <small>{item.desc} · {item.time}</small>
+                  </div>
+                  <button type="button" onClick={() => deleteHazard(item.id)} aria-label="删除这条上报"><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+
+            <p className="more-hint">
+              <CheckCircle2 size={13} /> 同一设备两端直接共享；扫码加入演练后，手机上出的照片和位置会跨设备同步到系统端。
+            </p>
+          </div>
+        )}
 
         {tab === 'plan' && (
           <div className="more-body">
@@ -431,6 +578,13 @@ export default function MoreSheet({
               <Link2 size={16} /> 切换到系统端
             </a>
             <p className="more-hint">也可以把两个地址分别加入主屏图标，现场一人一机同时使用。</p>
+            <a className="more-link" href="./mobile-install.html">
+              <Smartphone size={16} /> 装到手机主屏（iPhone / Android 图文步骤）
+            </a>
+            <p className="more-hint">
+              iPhone 用 Safari 打开本页 → 分享 → 添加到主屏幕，即可全屏运行、断网也能打开逃生页；
+              需要描述文件安装的按页面里的步骤走即可。
+            </p>
           </div>
         )}
 
