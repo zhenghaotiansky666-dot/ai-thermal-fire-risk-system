@@ -39,7 +39,8 @@ const upstream = readArg('--upstream', 'http://127.0.0.1:11434/v1').replace(/\/$
 const checkOnly = hasFlag('--check-only')
 const shouldOpen = !hasFlag('--no-open')
 const withHardware = !hasFlag('--no-hardware')
-const hardwarePort = Number(readArg('--hardware-port', '5000'))
+// 全平台统一 8787（macOS 的 5000 被隔空播放占用）
+const hardwarePort = Number(readArg('--hardware-port', '8787'))
 const ollamaPort = new URL(upstream).port || '11434'
 // 显式给了 --upstream 就说明用的是别的端点（LM Studio / 自建），不再去管 Ollama
 const isOllama = !args.includes('--upstream')
@@ -277,10 +278,10 @@ export async function main() {
   console.log(`  模型名  ：${report.checks.find((item) => item.id === 'models')?.matched ?? model}`)
   console.log('')
   console.log('== 硬件（ESP32-S3）==')
-  console.log('  可见光上传：http://<本机IP>:5000/upload          ← 固件 serverUrl')
-  console.log('  热像上传：  http://<本机IP>:5000/upload_thermal   ← 固件 thermalServerUrl')
-  console.log('  观察页面：  http://127.0.0.1:5000/')
-  console.log('  没有硬件时可先用模拟器：node tools/hardware-sim.mjs --port 5000 --hot')
+  console.log(`  可见光上传：http://<本机IP>:${hardwarePort}/upload          ← 固件 serverUrl`)
+  console.log(`  热像上传：  http://<本机IP>:${hardwarePort}/upload_thermal   ← 固件 thermalServerUrl`)
+  console.log(`  观察页面：  http://127.0.0.1:${hardwarePort}/`)
+  console.log(`  没有硬件时可先用模拟器：node tools/hardware-sim.mjs --port ${hardwarePort} --hot`)
   console.log('')
   console.log('手机扫下面这个二维码即可打开系统端：')
   await printQr(lanUrl)

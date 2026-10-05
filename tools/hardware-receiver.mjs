@@ -1,4 +1,4 @@
-// 硬件接收端（ESP32-S3 火警探测器 → 电脑）端口 5000
+// 硬件接收端（ESP32-S3 火警探测器 → 电脑）
 //
 // 对应硬件队友固件 src/main.cpp 里的两个上传点：
 //   1) POST /upload          可见光 JPEG（Content-Type: image/jpeg，body 是原始 JPEG 字节）
@@ -13,8 +13,8 @@
 //   · 提供 /latest、/latest.jpg、/thermal.png、/health、/log 给前端和调试用
 //
 // 用法：
-//   node tools/hardware-receiver.mjs                    # 默认 0.0.0.0:5000
-//   node tools/hardware-receiver.mjs --port 5000 --vision-url http://127.0.0.1:8000 --yes-temp 70
+//   node tools/hardware-receiver.mjs                    # 默认 0.0.0.0:8787
+//   node tools/hardware-receiver.mjs --port 8787 --vision-url http://127.0.0.1:8000 --yes-temp 70
 
 import { createServer } from 'node:http'
 import { createServer as createProbeServer } from 'node:net'
@@ -23,17 +23,77 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { networkInterfaces } from 'node:os'
 
-function lanAddresses() {
+// 所有非回环 IPv4，带上网卡名（网线接入时要挑"有线那张网卡"的地址给固件）
+function lanInterfaces() {
   const out = []
   const interfaces = networkInterfaces()
-  Object.values(interfaces).forEach((list) => {
-    (list ?? []).forEach((item) => {
-      if (item.family === 'IPv4' && !item.internal) out.push(item.address)
-    })
-  })
+  for (const [name, list] of Object.entries(interfaces)) {
+    for (const item of list ?? []) {
+      if (item.family === 'IPv4' && !item.internal) out.push({ name, address: item.address })
+    }
+  }
   return out
+}
+
+function lanAddresses() {
+  return lanInterfaces().map((item) => item.address)
+}
+
+// macOS 上用 networksetup 拿到"网卡名 → 硬件端口类型"的权威映射；
+// 其它平台拿不到就退回按名字猜。这个映射只用于"打印给固件的地址选哪一个"。
+export function hardwarePortKinds() {
+  if (process.platform !== 'darwin') return {}
+  try {
+    const text = execFileSync('networksetup', ['-listallhardwareports'], { encoding: 'utf8', timeout: 3000 })
+    const kinds = {}
+    const blocks = text.split(/\n(?=Hardware Port:)/)
+    for (const block of blocks) {
+      const port = /Hardware Port:\s*(.+)/.exec(block)?.[1]?.trim() ?? ''
+      const device = /Device:\s*(\S+)/.exec(block)?.[1]?.trim() ?? ''
+      if (!device) continue
+      if (/wi-?fi|airport|无线/i.test(port)) kinds[device] = 'wireless'
+      else if (/ethernet|雷雳|thunderbolt|usb\s*10\/100|lan/i.test(port)) kinds[device] = 'wired'
+      else kinds[device] = 'other'
+    }
+    return kinds
+  } catch {
+    return {}
+  }
+}
+
+// 纯函数：把 {name,address} 列表分类成 wired / wireless / unknown（便于单测）
+export function classifyLanInterfaces(entries = [], portKinds = {}) {
+  return entries.map((entry) => {
+    const known = portKinds[entry.name]
+    let kind = 'unknown'
+    if (known === 'wired') kind = 'wired'
+    else if (known === 'wireless') kind = 'wireless'
+    else if (/^eth|^enx|^usb/i.test(entry.name)) kind = 'wired'
+    else if (/^wl/i.test(entry.name)) kind = 'wireless'
+    return { ...entry, kind }
+  })
+}
+
+// 纯函数：挑选要写进固件的地址
+//   优先级：--interface 指定 > --medium 指定（ethernet/wifi）> 有线的第一张 > 未知的第一张 > 第一张
+export function pickInterface(entries = [], { prefer = '', medium = '' } = {}) {
+  if (!entries.length) return null
+  if (prefer) {
+    const exact = entries.find((item) => item.name === prefer)
+    if (exact) return exact
+  }
+  if (medium === 'ethernet' || medium === 'wired') {
+    return entries.find((item) => item.kind === 'wired') ?? entries[0]
+  }
+  if (medium === 'wifi' || medium === 'wireless') {
+    return entries.find((item) => item.kind === 'wireless') ?? entries[0]
+  }
+  return entries.find((item) => item.kind === 'wired')
+    ?? entries.find((item) => item.kind === 'unknown')
+    ?? entries[0]
 }
 
 const args = process.argv.slice(2)
@@ -43,7 +103,11 @@ const readArg = (name, fallback) => {
 }
 const hasFlag = (name) => args.includes(name)
 
-// 端口优先级：--port 参数 > 环境变量 TG_HARDWARE_PORT > ai-config.json 的 hardwarePort > 默认 5000
+// 全平台统一 8787：macOS 的 5000 被系统「隔空播放接收器」占用，Windows 用 8787 也不冲突，
+// 团队只记一个端口，固件两行地址也跟着是 8787。
+export const DEFAULT_HARDWARE_PORT = 8787
+
+// 端口优先级：--port 参数 > 环境变量 TG_HARDWARE_PORT > ai-config.json 的 hardwarePort > 平台默认
 // 这样"演示电脑用哪个端口"可以在配置文件里统一，固件那边只改一次。
 function portFromConfig() {
   for (const candidate of ['public/ai-config.json', 'ai-config.json']) {
@@ -54,11 +118,11 @@ function portFromConfig() {
   }
   return null
 }
-const portFromArgs = args.includes('--port') ? Number(readArg('--port', '5000')) : null
+const portFromArgs = args.includes('--port') ? Number(readArg('--port', String(DEFAULT_HARDWARE_PORT))) : null
 const port = portFromArgs
   ?? (Number.isFinite(Number(process.env.TG_HARDWARE_PORT)) ? Number(process.env.TG_HARDWARE_PORT) : null)
   ?? portFromConfig()
-  ?? 5000
+  ?? DEFAULT_HARDWARE_PORT
 const host = readArg('--host', '0.0.0.0')
 const strictPort = hasFlag('--strict-port')
 const visionUrl = String(readArg('--vision-url', process.env.TG_VISION_URL || '')).replace(/\/$/, '')
@@ -68,6 +132,9 @@ const outDir = resolve(readArg('--out', 'output/hardware'))
 const alwaysYes = hasFlag('--always-yes')
 const keepFrames = Number(readArg('--keep', '20'))
 const printFirmware = hasFlag('--print-firmware')
+// 网线接入：指定用哪张网卡的地址写进固件（不指定就自动挑有线那张）
+const preferInterface = readArg('--interface', '')
+const medium = readArg('--medium', '')
 // 确认火情后把事件广播出去，让「现场警报喇叭页」和用户端一起反应
 const publishUrl = readArg('--publish-url', process.env.TG_PUBLISH_URL || 'http://127.0.0.1:4173/sync/publish')
 const publishChannel = readArg('--publish-channel', process.env.TG_PUBLISH_CHANNEL || '')
@@ -420,6 +487,13 @@ function speakAlert({ maxTemp, smoke }) {
   }
 }
 
+// 上传方的地址：用于判断这一帧是走 Wi-Fi 还是走网线进来的（有线网段一眼能看出来）
+export function clientAddress(request) {
+  const raw = String(request?.socket?.remoteAddress ?? '').trim()
+  if (!raw) return 'unknown'
+  return raw.startsWith('::ffff:') ? raw.slice(7) : raw
+}
+
 async function readBody(request, limitBytes = 8 * 1024 * 1024) {
   const chunks = []
   let size = 0
@@ -442,7 +516,7 @@ h1{font-size:22px;margin:0 0 6px}p{color:#8ea5c2;font-size:13px}
 code{color:#9ad6ff}ul{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-direction:column;gap:6px}
 li{padding:9px 11px;border-radius:10px;background:rgba(4,13,27,.6);border:1px solid rgba(96,165,250,.16);font-size:12px}
 .yes{color:#8fe8b3}.no{color:#ffb4a8}</style></head><body><main>
-<h1>硬件接收端（端口 5000）</h1>
+<h1>硬件接收端（端口 <span id="port">—</span>）</h1>
 <p>ESP32-S3 通过 Wi-Fi 把可见光照片发到 <code>POST /upload</code>、把 768 点温度矩阵发到 <code>POST /upload_thermal</code>。</p>
 <div class="grid">
   <section class="card"><strong>可见光（/upload）</strong><img id="vis" alt="等待照片" />
@@ -454,6 +528,7 @@ li{padding:9px 11px;border-radius:10px;background:rgba(4,13,27,.6);border:1px so
 <script>
 async function tick(){
   try{
+    document.getElementById('port').textContent = location.port || (location.protocol === 'https:' ? '443' : '80');
     const r = await fetch('./latest', { cache:'no-store' }); const data = await r.json();
     if(data.visible){ document.getElementById('vis').src = './latest.jpg?t=' + data.visible.at; document.getElementById('visMeta').textContent =
       new Date(data.visible.at).toLocaleTimeString('zh-CN') + ' · ' + Math.round(data.visible.bytes/1024) + ' KB · 终审 ' + data.visible.decision + '（' + data.visible.source + '）'; }
@@ -510,6 +585,8 @@ const server = createServer(async (request, response) => {
         decision: decision.answer,
         source: decision.source,
         reason: decision.reason,
+        // 记下这张图是从哪个地址来的：网线接入时这里会显示有线网段的 IP
+        from: clientAddress(request),
       }
       store.visible.unshift({ ...record, jpeg: parsed.jpeg })
       if (store.visible.length > keepFrames) store.visible.length = keepFrames
@@ -521,6 +598,7 @@ const server = createServer(async (request, response) => {
         source: decision.source,
         reason: decision.reason,
         bytes: record.bytes,
+        from: record.from,
       })
       console.log(`[upload] ${(parsed.jpeg.length / 1024).toFixed(1)} KB → ${decision.answer}（${decision.source}：${decision.reason}）`)
       // 确认火灾就现场播报（路过的人也能听到），并写进日志
@@ -550,12 +628,12 @@ const server = createServer(async (request, response) => {
         return
       }
       const png = renderThermalPng(parsed.matrix)
-      const record = { at: Date.now(), maxTemp: parsed.maxTemp, matrix: parsed.matrix, png }
+      const record = { at: Date.now(), maxTemp: parsed.maxTemp, matrix: parsed.matrix, png, from: clientAddress(request) }
       store.thermal.unshift(record)
       if (store.thermal.length > keepFrames) store.thermal.length = keepFrames
       await writeFile(resolve(outDir, 'latest-thermal.json'), JSON.stringify({ at: record.at, max_temp: parsed.maxTemp, sensor_data: parsed.matrix })).catch(() => {})
       if (png) await writeFile(resolve(outDir, 'latest-thermal.png'), png).catch(() => {})
-      pushLog({ at: record.at, answer: 'DATA', source: 'thermal-upload', reason: `最高温 ${parsed.maxTemp.toFixed(1)}°C，${parsed.matrix.length} 个温度点` })
+      pushLog({ at: record.at, answer: 'DATA', source: 'thermal-upload', reason: `最高温 ${parsed.maxTemp.toFixed(1)}°C，${parsed.matrix.length} 个温度点`, from: record.from })
       console.log(`[upload_thermal] 最高温 ${parsed.maxTemp.toFixed(1)}°C，矩阵 ${parsed.matrix.length} 点`)
       json(response, 200, { ok: true, max_temp: parsed.maxTemp, points: parsed.matrix.length })
       return
@@ -570,8 +648,8 @@ const server = createServer(async (request, response) => {
     const thermal = store.thermal[0]
     json(response, 200, {
       ok: true,
-      visible: visible ? { at: visible.at, bytes: visible.bytes, decision: visible.decision, source: visible.source, reason: visible.reason } : null,
-      thermal: thermal ? { at: thermal.at, maxTemp: thermal.maxTemp, points: thermal.matrix.length } : null,
+      visible: visible ? { at: visible.at, bytes: visible.bytes, decision: visible.decision, source: visible.source, reason: visible.reason, from: visible.from } : null,
+      thermal: thermal ? { at: thermal.at, maxTemp: thermal.maxTemp, points: thermal.matrix.length, from: thermal.from } : null,
       log: store.log.slice(0, 12),
       visionUrl: visionUrl || null,
       yesTemp,
@@ -651,6 +729,15 @@ async function pickPort(start) {
 
 function printBanner() {
   console.log(`硬件接收端已启动：http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${activePort}`)
+  const entries = classifyLanInterfaces(lanInterfaces(), hardwarePortKinds())
+  if (entries.length) {
+    console.log('  本机网卡：')
+    entries.forEach((item) => {
+      const label = item.kind === 'wired' ? '有线' : item.kind === 'wireless' ? '无线' : '未知'
+      console.log(`    ${item.name.padEnd(8)} ${item.address.padEnd(16)} ${label}`)
+    })
+    console.log('  （网线接入时把"有线"那条的地址写进固件；也可以直接跑 --print-firmware 自动生成）')
+  }
   console.log(`  可见光上传：POST http://<本机IP>:${activePort}/upload        （固件 serverUrl）`)
   console.log(`  热像上传：  POST http://<本机IP>:${activePort}/upload_thermal （固件 thermalServerUrl）`)
   console.log(`  观察页面：  http://127.0.0.1:${activePort}/`)
@@ -666,12 +753,39 @@ function printBanner() {
     console.log(`         const char* thermalServerUrl = "http://<电脑IP>:${activePort}/upload_thermal";`)
   }
   if (printFirmware) {
-    const lan = lanAddresses()[0] ?? '127.0.0.1'
+    const entries = classifyLanInterfaces(lanInterfaces(), hardwarePortKinds())
+    const picked = pickInterface(entries, { prefer: preferInterface, medium })
+    const lan = picked?.address ?? '127.0.0.1'
     console.log('')
-    console.log('== 复制到 ESP32 固件的两行（把 IP 换成这台电脑的局域网地址）==')
+    console.log(`== 复制到 ESP32 固件的两行（用的是 ${picked ? `${picked.name}（${picked.kind === 'wired' ? '有线' : picked.kind === 'wireless' ? '无线' : '未知类型'}）` : '本机地址'}）==`)
     console.log(`const char* serverUrl        = "http://${lan}:${activePort}/upload";`)
     console.log(`const char* thermalServerUrl = "http://${lan}:${activePort}/upload_thermal";`)
     console.log('（原来的 thermalServerUrl 是 "http://10.240.250"，少了端口与路径，必须替换）')
+    console.log('')
+    console.log('== 这台电脑上的网卡（网线接入时看这一行）==')
+    entries.forEach((item) => {
+      const label = item.kind === 'wired' ? '有线' : item.kind === 'wireless' ? '无线' : '未知'
+      console.log(`   ${item.name.padEnd(8)} ${item.address.padEnd(16)} ${label}${item.address === lan ? '   ← 上面两行用的是这个' : ''}`)
+    })
+    if (picked?.kind === 'wired' || medium === 'ethernet' || medium === 'wired') {
+      const wired = entries.find((item) => item.kind === 'wired')
+      if (!wired) {
+        console.log('')
+        console.log('⚠️ 没有检测到有线网卡：插上 USB/雷雳网线适配器（或确认系统设置里已拿到 IP）后重新运行本命令，会自动填好地址。')
+        console.log('   下面片段里的地址先用占位符，等你插上网线再替换成"有线"那条。')
+      }
+      console.log('')
+      console.log('== 网线（W5500 以太网）远程接口 · 固件侧需要补的片段 ==')
+      console.log('   // W5500 走 SPI，注意与相机/热像模块的引脚错开（详见 docs/网线接入（W5500）-远程接口.md）')
+      console.log('   #include <SPI.h>')
+      console.log('   #include <Ethernet.h>')
+      console.log('   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };')
+      console.log('   Ethernet.begin(mac);                       // 插上网线后自动 DHCP 拿地址')
+      console.log('   IPAddress host;')
+      console.log(`   host.fromString("${wired ? wired.address : '192.168.1.20'}");                 // 这台电脑${wired ? `有线网卡 ${wired.name} ` : '有线网卡（占位，插上网线后替换）'}的地址`)
+      console.log(`   EthernetClient client;  client.connect(host, ${activePort});   // 之后复用现有 POST /upload 逻辑`)
+      console.log(`   // 自检：在这台电脑上执行  curl http://${wired ? wired.address : '<有线网卡IP>'}:${activePort}/health`)
+    }
   }
 }
 

@@ -2150,6 +2150,35 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 .speaker-actions button.primary { color: #fff; border-color: rgba(248,113,113,.5); background: linear-gradient(110deg,#dc2626,#f97316); }
 .speaker-actions button:disabled { opacity: .45; }
 .hardware-stats strong.is-live { color: #8fe8b3; }
+
+/* ==== AI 网关（笔记本视频流 → WebSocket）==== */
+.ai-gateway-card { margin-bottom: 12px; border-color: rgba(110,168,255,.28); }
+.ai-gateway-status {
+  display: flex; align-items: center; gap: 9px;
+  margin-top: 10px; padding: 10px 12px;
+  border: 1px solid rgba(96,165,250,.2); border-radius: 11px;
+  background: rgba(10,16,24,.6); color: var(--text-2); font-size: 11px;
+}
+.ai-gateway-status i { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+.ai-gateway-status.state-connected { border-color: rgba(34,197,94,.42); color: #bdf3d0; }
+.ai-gateway-status.state-connected i { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+.ai-gateway-status.state-connecting i { background: #f59e0b; animation: aiDotPulse 1s ease-in-out infinite; }
+.ai-gateway-status.state-failed { border-color: rgba(239,68,68,.45); color: #fecaca; }
+.ai-gateway-status.state-failed i { background: #ef4444; }
+.ai-gateway-status b { margin-left: auto; color: #e8f2ff; }
+.ai-gateway-input { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; color: var(--text-2); font-size: 10px; }
+.ai-gateway-input input { min-height: 40px; padding: 9px 11px; color: #e9f4ff; border: 1px solid rgba(96,165,250,.22); border-radius: 10px; background: rgba(4,13,27,.68); font-size: 11px; }
+.ai-gateway-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ai-gateway-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; color: #cfe3f7; border: 1px solid rgba(96,165,250,.24); border-radius: 10px; background: rgba(59,130,246,.12); font-size: 11px; font-weight: 600; }
+.ai-gateway-actions button.primary { color: #04121f; border-color: transparent; background: linear-gradient(110deg,#38bdf8,#7dd3fc); }
+.ai-gateway-actions button:disabled { opacity: .45; }
+.ai-gateway-readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.ai-gateway-readout > div { display: flex; flex-direction: column; gap: 5px; padding: 10px 11px; border: 1px solid rgba(96,165,250,.15); border-radius: 11px; background: rgba(4,13,27,.55); }
+.ai-gateway-readout span { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 9px; }
+.ai-gateway-readout strong { color: #e3eefb; font-size: 15px; }
+.ai-gateway-readout strong.is-hot { color: #ffb4a8; }
+.ai-gateway-error { margin: 10px 0 0; color: #ffb4a8; font-size: 10px; }
+@media (max-width: 620px) { .ai-gateway-readout { grid-template-columns: repeat(2, 1fr); } }
 .ai-pair { padding: 11px 12px; border: 1px solid rgba(56,189,248,.32); border-radius: 12px; background: rgba(14,165,233,.1); display: flex; flex-direction: column; gap: 8px; }
 /* AI 自动检测块 */
 .ai-autodetect-line { margin: 6px 0 0; font-size: 11px; font-weight: 700; color: #dcecff; }

@@ -3,11 +3,14 @@
 import {
   buildAlertPhrase,
   buildHardwareFireEvent,
+  classifyLanInterfaces,
+  clientAddress,
   decideFire,
   encodePng,
   extractImage,
   parseMultipart,
   parseThermalPayload,
+  pickInterface,
   pickTtsCommand,
   renderThermalPng,
   shouldSpeak,
@@ -129,6 +132,33 @@ console.log('[7] 硬件火情事件（广播给喇叭页与用户端）')
   const noTemp = buildHardwareFireEvent({ maxTemp: null })
   check('没有温度时不写 NaN', !String(noTemp.payload.notice).includes('NaN') && noTemp.payload.maxTemp === null)
   check('默认节点可用', noTemp.payload.nodeId === 'C4' && noTemp.payload.floor === 4)
+}
+
+console.log('[10] 网线接入：网卡分类与地址选择')
+{
+  const entries = [
+    { name: 'en0', address: '192.168.1.20' },
+    { name: 'en5', address: '10.20.30.40' },
+    { name: 'utun4', address: '172.16.0.2' },
+  ]
+  const kinds = { en0: 'wireless', en5: 'wired' }
+  const classified = classifyLanInterfaces(entries, kinds)
+  check('按硬件端口映射分类', classified[0].kind === 'wireless' && classified[1].kind === 'wired')
+  check('没有映射时按名字猜：eth/enx/usb 视为有线', classifyLanInterfaces([{ name: 'enx1234', address: '1.2.3.4' }])[0].kind === 'wired')
+
+  check('默认优先选有线网卡', pickInterface(classified)?.name === 'en5')
+  check('--interface 指定优先', pickInterface(classified, { prefer: 'en0' })?.name === 'en0')
+  check('--medium wifi 时选无线', pickInterface(classified, { medium: 'wifi' })?.name === 'en0')
+  check('--medium ethernet 时选有线', pickInterface(classified, { medium: 'ethernet' })?.name === 'en5')
+  check('只有无线时退回无线而不是空', pickInterface(classifyLanInterfaces([{ name: 'en0', address: 'x' }], kinds))?.name === 'en0')
+  check('空列表返回 null', pickInterface([]) === null)
+}
+
+console.log('[11] 上传来源地址（区分 Wi-Fi 与网线）')
+{
+  check('去掉 IPv4-mapped 前缀', clientAddress({ socket: { remoteAddress: '::ffff:192.168.1.88' } }) === '192.168.1.88')
+  check('纯 IPv4 原样返回', clientAddress({ socket: { remoteAddress: '10.20.30.40' } }) === '10.20.30.40')
+  check('拿不到地址时返回 unknown', clientAddress({}) === 'unknown' && clientAddress(null) === 'unknown')
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

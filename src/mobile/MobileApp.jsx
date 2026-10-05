@@ -67,8 +67,10 @@ import { HazardReport, InspectionPanel, ReportButton, exportIncidentPdf, openPdf
 import { PreventionPanel, RescueBriefPanel, VitalSignsPanel, copyNotice } from './PhasePanels.jsx'
 import HardwareFeed from './HardwareFeed.jsx'
 import SpeakerPanel from './SpeakerPanel.jsx'
+import AiGatewayPanel from './AiGatewayPanel.jsx'
 import { aiCommand, readAiSettings } from '../shared/aiClient.js'
 import { aiStatus, autoDiscoverAi, subscribeAiStatus } from '../shared/aiClient.js'
+import { autoConnectGateway } from '../shared/aiGateway.js'
 import { readUserStatuses } from '../user/binaryDialogue.js'
 import LinkSheet from './LinkSheet.jsx'
 import { createEvent, fireFromEvent, peerReportSummary, sharedEventBus } from '../shared/eventBus.js'
@@ -849,6 +851,8 @@ export default function MobileApp() {
   useEffect(() => {
     const unsubscribe = subscribeAiStatus(setAiState)
     autoDiscoverAi()
+    // 之前手动连过 AI 网关的机器，重开页面自动重连（公网演示站没配过就不会自己连本地）
+    autoConnectGateway()
     return unsubscribe
   }, [])
 
@@ -1530,6 +1534,7 @@ export default function MobileApp() {
             fireText={fireLocationDetail ? `${fireLocationDetail} 发生火情` : ''}
             onToast={setToast}
           />
+          <AiGatewayPanel onToast={setToast} />
           <HardwareFeed
             onFrame={(nextFrame) => {
               // 硬件热像接入检测链路：帧结构一致，报警阈值/危险场/疏散自动复用

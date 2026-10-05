@@ -32,6 +32,41 @@ node tools/make-desktop-zip.mjs outputs     # 产出 热感哨兵-电脑版-<日
 **docs/硬件同学-编辑指南.md** —— 端口三处怎么改、`/upload` 与 `/upload_thermal` 的约定、
 终审阈值、固件两行地址怎么生成、哪些接口不要动、以及自检与常见坑。
 
+## AI 网关接入（YOLOv8 视觉通道）
+
+笔记本接摄像头跑 YOLOv8（或 OpenCV 兜底、或模拟器），通过 WebSocket 持续推送检测结果：
+
+```bash
+node gateway/ai-gateway.mjs --mode simulator --port 8899
+node gateway/ai-gateway.mjs --mode detector --source 0 --model best.pt --port 8899
+```
+
+系统端「监控」页的 **AI 网关**卡片填 `ws://127.0.0.1:8899/ws/detections` 即可连接。
+火焰/烟雾置信度会直接进入阶段一的三路证据融合与报警判定（不是只显示目标数），
+超过 8 秒没有新帧就按"无证据"处理。
+
+**docs/AI网关接入说明.md** —— 端口分工（8787 硬件 / 8899 AI）、消息格式、
+HTTPS 页面下的 wss 与同源代理、联调检查清单。
+
+## 网线接入（W5500 以太网）
+
+硬件侧支持 Wi-Fi 与 SPI 网卡（W5500）双介质。接收端会优先挑选有线网卡并打印对应固件地址：
+
+```bash
+node tools/hardware-receiver.mjs --print-firmware --medium ethernet   # 只取有线网卡
+node tools/hardware-receiver.mjs --print-firmware --interface en5     # 指定网卡
+```
+
+每帧数据都会记录来源 IP，指挥端可据此判断这一路走的是网线还是 Wi-Fi。
+
+**docs/网线接入（W5500）-远程接口.md** —— 电脑端确认网卡、W5500 SPI 接线片段、
+跨网段同源代理、验证步骤与改动清单。
+
+## 软件方向介绍（PPT 素材）
+
+**docs/软件方向介绍（PPT素材）.md** —— 系统端六大模块、三阶段 AI 决策链、
+用户端三步使用流程与便捷性设计，附建议截图清单。
+
 ## 功能
 
 - 热成像图片上传、拖拽与本地预览

@@ -117,7 +117,7 @@ export default function HardwareFeed({ onFrame }) {
                 : <div className="hardware-empty">等待硬件上传照片…</div>}
               <p>
                 {visible
-                  ? `${new Date(visible.at).toLocaleTimeString('zh-CN')} · ${Math.round(visible.bytes / 1024)} KB · 终审 ${visible.decision}（${visible.source}）`
+                  ? `${new Date(visible.at).toLocaleTimeString('zh-CN')} · ${Math.round(visible.bytes / 1024)} KB · 终审 ${visible.decision}（${visible.source}）${visible.from ? ` · 来源 ${visible.from}` : ''}`
                   : '固件触发条件是 烟雾 > 2000 或 最高温 > 70°C'}
               </p>
             </figure>
@@ -129,7 +129,7 @@ export default function HardwareFeed({ onFrame }) {
                 : <div className="hardware-empty">等待硬件上传热像…</div>}
               <p>
                 {thermal
-                  ? `${new Date(thermal.at).toLocaleTimeString('zh-CN')} · 最高 ${thermal.maxTemp.toFixed(1)}°C · ${thermal.points} 个温度点`
+                  ? `${new Date(thermal.at).toLocaleTimeString('zh-CN')} · 最高 ${thermal.maxTemp.toFixed(1)}°C · ${thermal.points} 个温度点${thermal.from ? ` · 来源 ${thermal.from}` : ''}`
                   : 'MLX90640 · 32×24 温度矩阵'}
               </p>
             </figure>

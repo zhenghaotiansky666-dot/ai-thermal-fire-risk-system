@@ -5,7 +5,7 @@
 //   2) POST /upload_thermal  Content-Type: application/json + {max_temp, sensor_data:[768]}
 //
 // 用法：
-//   node tools/hardware-sim.mjs                          # 发一张示例热像 + 一张示例照片到本机 5000
+//   node tools/hardware-sim.mjs                          # 发一张示例热像 + 一张示例照片到本机接收端（macOS 默认 8787）
 //   node tools/hardware-sim.mjs --host 192.168.1.20      # 发给另一台电脑
 //   node tools/hardware-sim.mjs --hot                    # 造一个"高温火情"帧（触发 YES）
 //   node tools/hardware-sim.mjs --loop 3                 # 循环 3 轮，每轮间隔 2 秒
@@ -19,7 +19,7 @@ const readArg = (name, fallback) => {
   return index >= 0 && args[index + 1] ? args[index + 1] : fallback
 }
 const host = readArg('--host', '127.0.0.1')
-const port = Number(readArg('--port', '5000'))
+const port = Number(readArg('--port', '8787'))
 const rounds = Number(readArg('--loop', '1'))
 const hot = args.includes('--hot')
 const base = `http://${host}:${port}`
