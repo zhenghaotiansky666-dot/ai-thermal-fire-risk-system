@@ -117,8 +117,8 @@ bool sendNativePost(const char* path, uint8_t* payload, size_t payload_len, bool
         EthernetClient ethClient;
         PostResult wired = postTo(ethClient, ethServerIP, ethServerPort, path, payload, payload_len, is_json);
         if (wired.connected) {
-            Serial.println(String("【通路：W5500 有线网线】数据已送入 Mac")
-                           + (wired.gotYes ? "，终审答复 YES" : ""));
+            Serial.print("【通路：W5500 有线网线】数据已送入 Mac");
+            Serial.println(wired.gotYes ? "，终审答复 YES" : "（Mac 回了 NO）");
             return wired.gotYes;
         }
         Serial.println("【有线】网线在但连不上 Mac（检查 Mac 是否已设 192.168.1.20），改走无线…");
@@ -227,6 +227,7 @@ void setup() {
     // 直连 Mac 这条线上没有 DHCP，必须用静态 IP（原来 Ethernet.begin(mac) 走 DHCP 必然失败，
     // 这也正是"网线插着但一直显示不通"的原因）。
     Serial.println("正在拉通物理有线网口（W5500 静态 IP 初始化）...");
+    SPI.begin();                 // W5500 走 SPI，先把总线拉起来
     Ethernet.init(ETH_CS_PIN);
     Ethernet.begin(mac, ethIp, noGateway, noGateway, ethSubnet);
     delay(200);
