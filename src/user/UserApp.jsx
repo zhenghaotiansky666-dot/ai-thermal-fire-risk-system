@@ -377,6 +377,17 @@ export default function UserApp() {
     return list.length ? Math.max(...list) : 0
   }, [telemetry])
 
+  // 硬件链路：系统端收到 ESP32 的每一帧都会写进遥测，这里据此告诉用户"传感器已接入"
+  const hardwareLink = useMemo(() => {
+    const nodes = telemetry?.nodes ?? []
+    if (!nodes.length) return null
+    const top = nodes.reduce((best, node) => (Number(node?.temp) > Number(best?.temp) ? node : best), nodes[0])
+    const temp = Number(top?.temp)
+    if (!Number.isFinite(temp)) return null
+    const floor = top?.floor ? `${top.floor} 楼 · ` : ''
+    return `硬件链路已接入 · ${floor}${temp.toFixed(0)}°C（ESP32 热像实时上传）`
+  }, [telemetry])
+
   const route = useMemo(() => {
     const startId = positionNodeId(position.floor, position.spot)
     const base = computeRoute({ startId, fire: hazardSources, elapsedSec })
@@ -662,6 +673,8 @@ export default function UserApp() {
           </div>
 
           {sensorInfo && <div className="sensor-note">{sensorInfo}</div>}
+
+          {hardwareLink && <div className="sensor-note is-link">{hardwareLink}</div>}
 
           {route?.copilot?.block && (
             <div className="sensor-note is-copilot">

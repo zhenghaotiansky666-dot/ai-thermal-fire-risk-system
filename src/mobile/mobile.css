@@ -2134,6 +2134,30 @@ code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospa
 
 .hardware-stats strong.is-live { color: #8fe8b3; }
 
+/* 链路状态：一眼看出无线/有线通没通、固件该填哪个地址 */
+.hardware-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid rgba(96,165,250,.2);
+  border-radius: 12px;
+  background: rgba(5,15,29,.6);
+}
+.hardware-links-head { display: flex; align-items: center; gap: 6px; color: #9db6cf; font-size: 9px; font-weight: 600; }
+.hardware-link { display: grid; grid-template-columns: 8px 34px 1fr auto; align-items: center; gap: 8px; font-size: 9px; }
+.hardware-link i { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; }
+.hardware-link.is-up i { background: #30d158; box-shadow: 0 0 0 3px rgba(48,209,88,.18); }
+.hardware-link.is-down i { background: #ff9f0a; }
+.hardware-link strong { color: #cfe3f7; font-weight: 600; }
+.hardware-link span { color: #8fa9c2; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.hardware-link em { color: #7089a4; font-style: normal; }
+.hardware-link.is-up em { color: #6ee7a0; }
+.hardware-link.is-down em { color: #ffb340; }
+.hardware-links-note { display: flex; align-items: flex-start; gap: 5px; margin: 2px 0 0; color: #7089a4; font-size: 8px; line-height: 1.6; }
+.hardware-links-note code { color: #9ad6ff; }
+
 /* ==== AI 网关（笔记本视频流 → WebSocket）==== */
 .ai-gateway-card { margin-bottom: 12px; border-color: rgba(110,168,255,.28); }
 .ai-gateway-status {

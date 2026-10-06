@@ -6,7 +6,7 @@
 // 页面通过同源 /hw/* 代理读取（HTTPS 页面不能直接访问 http://host:5000）
 
 import { useEffect, useRef, useState } from 'react'
-import { Activity, Camera, Cpu, Flame, Link2, RefreshCw, Wifi } from 'lucide-react'
+import { Activity, Camera, Cpu, Flame, Info, Link2, RefreshCw, Wifi } from 'lucide-react'
 import { frameFromMatrix } from './thermal.js'
 import { describeFreshness } from '../shared/freshness.js'
 
@@ -14,6 +14,7 @@ const POLL_MS = 2000
 
 export default function HardwareFeed({ onFrame, onThermal }) {
   const [data, setData] = useState(null)
+  const [link, setLink] = useState(null)
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
   const [online, setOnline] = useState(null)
@@ -34,6 +35,14 @@ export default function HardwareFeed({ onFrame, onThermal }) {
         setData(payload)
         setError('')
         setOnline(true)
+        // 顺带取一次链路状态（接收端 /health）：这台电脑有几条网、通没通、网线插好没
+        try {
+          const health = await fetch('./hw/health', { cache: 'no-store' })
+          if (health.ok) {
+            const info = await health.json()
+            if (!cancelled) setLink(info)
+          }
+        } catch {}
       } catch (err) {
         if (cancelled) return
         setOnline(false)
@@ -101,6 +110,35 @@ export default function HardwareFeed({ onFrame, onThermal }) {
           <RefreshCw size={16} />
         </button>
       </div>
+
+      {link && (() => {
+        // 只显示"活着的"链路：正在活动或拿到过地址的，避免把一堆虚拟网卡堆上来
+        const links = (link.links ?? []).filter((item) => item.status === 'active' || item.address)
+        const mediumLabel = (item) => (item.kind === 'wired' ? '有线' : item.kind === 'wireless' ? '无线' : '其他')
+        const lastFrom = thermal?.from || visible?.from || ''
+        const lastLink = links.find((item) => item.address && item.address === lastFrom)
+        const usable = links.find((item) => item.usable)
+        return (
+          <div className="hardware-links">
+            <div className="hardware-links-head">
+              <Link2 size={14} /> 链路状态 · 接收端在线（端口 {link.port}）
+            </div>
+            {links.map((item) => (
+              <div className={`hardware-link ${item.usable ? 'is-up' : 'is-down'}`} key={item.name}>
+                <i />
+                <strong>{mediumLabel(item)}</strong>
+                <span>{item.address ?? '没有 IP'}</span>
+                <em>{item.usable ? '已接入' : item.carrier ? '网线通了但没拿到 IP' : '未连接'}</em>
+              </div>
+            ))}
+            <p className="hardware-links-note">
+              <Info size={12} />
+              固件要填的地址：<code>{usable?.address ?? '（还没有可用地址）'}</code>
+              {lastFrom ? ` · 最近一帧来自 ${lastFrom}${lastLink ? `（${mediumLabel(lastLink)}）` : ''}` : ' · 还没收到任何一帧'}
+            </p>
+          </div>
+        )
+      })()}
 
       {online === false && (
         <div className="hardware-offline">

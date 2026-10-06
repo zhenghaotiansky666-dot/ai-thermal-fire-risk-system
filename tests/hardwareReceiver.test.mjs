@@ -3,12 +3,14 @@
 import {
   buildAlertPhrase,
   buildHardwareFireEvent,
+  describeLinks,
   classifyLanInterfaces,
   clientAddress,
   decideFire,
   encodePng,
   extractImage,
   parseMultipart,
+  parseCarrier,
   parseThermalPayload,
   pickInterface,
   pickTtsCommand,
@@ -159,6 +161,29 @@ console.log('[11] 上传来源地址（区分 Wi-Fi 与网线）')
   check('去掉 IPv4-mapped 前缀', clientAddress({ socket: { remoteAddress: '::ffff:192.168.1.88' } }) === '192.168.1.88')
   check('纯 IPv4 原样返回', clientAddress({ socket: { remoteAddress: '10.20.30.40' } }) === '10.20.30.40')
   check('拿不到地址时返回 unknown', clientAddress({}) === 'unknown' && clientAddress(null) === 'unknown')
+}
+
+console.log('[12] 链路状态（有线/无线通没通，给界面显示用）')
+{
+  const activeWifi = 'en0: flags=8863\n\tstatus: active\n\tmedia: autoselect'
+  const wiredNoDhcp = 'en7: flags=8863\n\tstatus: active\n\tmedia: autoselect (10baseT/UTP <full-duplex>)\n\tinet 169.254.112.5'
+  const unplugged = 'en5: flags=8863\n\tstatus: inactive\n\tmedia: none'
+
+  check('无线 active 且有 media → 有载波', parseCarrier(activeWifi).carrier === true)
+  check('inactive → 没有载波', parseCarrier(unplugged).carrier === false)
+  check('media 是 none → 没有载波', parseCarrier('status: active\nmedia: none').carrier === false)
+  check('没有 ifconfig 输出时不报错', parseCarrier('').carrier === false)
+
+  const probe = (name) => ({ en0: activeWifi, en7: wiredNoDhcp, en5: unplugged }[name] ?? '')
+  const links = describeLinks(
+    [{ name: 'en0', address: '192.168.1.20' }, { name: 'en7', address: '169.254.112.5' }, { name: 'en5', address: null }],
+    { en0: 'wireless', en7: 'wired', en5: 'wired' },
+    probe,
+  )
+  check('无线：有地址 + 有载波 → 可用', links[0].usable === true && links[0].kind === 'wireless')
+  check('有线 169.254：网线通了但没拿到 IP → 不可用', links[1].usable === false && links[1].carrier === true)
+  check('未插网线 → 不可用', links[2].usable === false && links[2].carrier === false)
+  check('分类沿用硬件端口映射', links[1].kind === 'wired')
 }
 
 console.log(`\n结果：${failures === 0 ? '全部通过' : `${failures} 项失败`}`)

@@ -27,7 +27,22 @@ import { execFileSync } from 'node:child_process'
 import { networkInterfaces } from 'node:os'
 
 // 所有非回环 IPv4，带上网卡名（网线接入时要挑"有线那张网卡"的地址给固件）
+// 169.254.x.x 是自己编的地址（没拿到 DHCP），不能写进固件，这里排除掉
 function lanInterfaces() {
+  const out = []
+  const interfaces = networkInterfaces()
+  for (const [name, list] of Object.entries(interfaces)) {
+    for (const item of list ?? []) {
+      if (item.family === 'IPv4' && !item.internal && !item.address.startsWith('169.254.')) {
+        out.push({ name, address: item.address })
+      }
+    }
+  }
+  return out
+}
+
+// 连 169.254 也带上：用来判断"网线插了、但对面没给 IP"
+function physicalInterfaces() {
   const out = []
   const interfaces = networkInterfaces()
   for (const [name, list] of Object.entries(interfaces)) {
@@ -36,6 +51,66 @@ function lanInterfaces() {
     }
   }
   return out
+}
+
+// 纯函数：解析 macOS `ifconfig <网卡>` 的载波状态
+//   status: active + media 不是 (none) 才算真的插好并连通
+export function parseCarrier(text = '') {
+  const status = /status:\s*(\w+)/.exec(String(text))?.[1] ?? ''
+  const media = /media:\s*([^\n]+)/.exec(String(text))?.[1]?.trim() ?? ''
+  return {
+    status,
+    media,
+    // 只有 active 且不是 (none) 才算有载波；这种才是"网线真的通"
+    carrier: status === 'active' && media !== '' && media !== 'none' && !/\(none\)/.test(media),
+  }
+}
+
+// 纯函数：把网卡列表收拾成前端能显示的样子
+export function describeLinks(entries = [], portKinds = {}, probe = () => '') {
+  return entries.map((entry) => {
+    const known = portKinds[entry.name]
+    const kind = known === 'wired' || known === 'wireless' ? known
+      : /^eth|^enx|^usb/i.test(entry.name) ? 'wired'
+        : /^wl/i.test(entry.name) ? 'wireless' : 'unknown'
+    const carrier = parseCarrier(probe(entry.name))
+    const linkLocal = /^169\.254\./.test(String(entry.address ?? ''))
+    // 169.254 是自己编的地址：网线插了但对面没给 IP，一样不能用来通信
+    const usable = carrier.carrier && !linkLocal
+    return { name: entry.name, address: entry.address, kind, ...carrier, usable }
+  })
+}
+
+function readLinkText(name) {
+  try {
+    return execFileSync('ifconfig', [name], { encoding: 'utf8', timeout: 2000 })
+  } catch {
+    return ''
+  }
+}
+
+// 把"这台电脑现在有几条链路、通没通"整成一份给界面看的快照。
+// 连没有 IP 的网卡也列出来（网线插了但对面没给地址的情况），前端才能说清"为什么没通"。
+// 每次都要跑 ifconfig，加个 3 秒缓存，页面轮询不会把 CPU 拖起来。
+let linkCache = { at: 0, value: null }
+function linkStatus() {
+  const now = Date.now()
+  if (linkCache.value && now - linkCache.at < 3000) return linkCache.value
+  const kinds = hardwarePortKinds()
+  const links = describeLinks(physicalInterfaces(), kinds, readLinkText)
+  for (const [name, kind] of Object.entries(kinds)) {
+    if (links.some((item) => item.name === name)) continue
+    const carrier = parseCarrier(readLinkText(name))
+    if (!carrier.status && !carrier.media) continue // 这张网卡不存在
+    links.push({ name, address: null, kind, ...carrier, usable: false })
+  }
+  const value = {
+    links,
+    wired: links.find((item) => item.kind === 'wired') ?? null,
+    wireless: links.find((item) => item.kind === 'wireless') ?? null,
+  }
+  linkCache = { at: now, value }
+  return value
 }
 
 function lanAddresses() {
@@ -562,6 +637,8 @@ const server = createServer(async (request, response) => {
       visionUrl: visionUrl || null,
       yesTemp,
       frames: { visible: store.visible.length, thermal: store.thermal.length },
+      // 给界面用：这台电脑有哪几条链路、网线插没插好、地址是多少
+      ...linkStatus(),
     })
     return
   }
