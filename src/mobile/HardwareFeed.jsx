@@ -67,8 +67,15 @@ export default function HardwareFeed({ onFrame, onThermal }) {
 
   // 「用硬件热像驱动检测」：把 MLX90640 上传的矩阵变成系统统一帧，
   // 于是三维热感板、报警阈值、危险场与疏散算法全部用真实传感器数据（而不是模拟器）
+  //
+  // 注意：外面传进来的 onFrame 每次渲染都是新函数，绝不能进依赖数组——
+  // 否则"拉一帧 → setState → 重新渲染 → 函数换了身份 → effect 重跑 → 再拉一帧"
+  // 会变成死循环，把接收端刷爆（这里踩过）。
+  const frameRef = useRef(onFrame)
+  useEffect(() => { frameRef.current = onFrame }, [onFrame])
+
   useEffect(() => {
-    if (!drive || !onFrame || !data?.thermal) return
+    if (!drive || !data?.thermal) return undefined
     let cancelled = false
     const load = async () => {
       try {
@@ -82,7 +89,7 @@ export default function HardwareFeed({ onFrame, onThermal }) {
           source: '硬件 MLX90640（Wi-Fi 上传）',
           timestamp: payload.at,
         })
-        if (frame && !cancelled) onFrame(frame)
+        if (frame && !cancelled) frameRef.current?.(frame)
       } catch {}
     }
     load()
@@ -91,7 +98,7 @@ export default function HardwareFeed({ onFrame, onThermal }) {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [drive, onFrame, data?.thermal?.at])
+  }, [drive, data?.thermal?.at])
 
   const visible = data?.visible ?? null
   const thermal = data?.thermal ?? null
