@@ -109,19 +109,29 @@ PostResult postTo(Client& client, const char* host, int port, const char* path,
 }
 
 // 🟢 核心智能路由：优先走有线，连不上或网线断开时自动降级到无线
+//
+// 现场遇到过"网口一会有一会没"（链路抖动）：如果每次上传都先去试那条抖动的网线，
+// 每次都要白等一个连接超时。所以有线失败后冷却 15 秒，这段时间直接走无线，
+// 冷却结束再试一次有线——既不耽误上报，也不会白等。
+unsigned long ethRetryAfter = 0;
+
 bool sendNativePost(const char* path, uint8_t* payload, size_t payload_len, bool is_json) {
     eth_connected = (Ethernet.linkStatus() == LinkON);
 
     // 🚀 策略一：物理有线（W5500 直连 Mac，走静态 IP）
-    if (eth_connected) {
+    const bool ethReady = eth_connected && millis() >= ethRetryAfter;
+    if (ethReady) {
         EthernetClient ethClient;
         PostResult wired = postTo(ethClient, ethServerIP, ethServerPort, path, payload, payload_len, is_json);
         if (wired.connected) {
             Serial.print("【通路：W5500 有线网线】数据已送入 Mac");
             Serial.println(wired.gotYes ? "，终审答复 YES" : "（Mac 回了 NO）");
+            ethRetryAfter = 0;                 // 有线好用，取消冷却
             return wired.gotYes;
         }
-        Serial.println("【有线】网线在但连不上 Mac（检查 Mac 是否已设 192.168.1.20），改走无线…");
+        // 网线在但连不上：冷却 15 秒，期间直接走无线
+        ethRetryAfter = millis() + 15000;
+        Serial.println("【有线】网线在但连不上 Mac（检查 Mac 是否已设 192.168.1.20）→ 冷却 15 秒后重试，先走无线…");
     }
 
     // 🌪️ 策略二：无线灾备
