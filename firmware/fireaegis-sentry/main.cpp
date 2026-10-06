@@ -1,0 +1,285 @@
+// ============================================================================
+// FireAegis · 智能前线固件（有线以太网优先 + Wi-Fi 灾备自动无缝切换版）
+// ============================================================================
+#include <Arduino.h>
+#include <SPI.h>         
+#include <Ethernet.h>    // 有线 W5500 硬件驱动
+#include <WiFi.h>        // 无线 Wi-Fi 备用驱动
+#include <Wire.h>
+#include <Adafruit_MLX90640.h>
+#include "esp_camera.h"
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEAdvertising.h>
+#include <ArduinoJson.h>
+
+// ==================== 1. 硬件引脚与参数配置 ====================
+#define I2C_SDA       45       // 红外 SDA 插在右排的 G45
+#define I2C_SCL       46       // 红外 SCL 插在右排的 G46
+#define BUZZER_PIN    3        // 蜂鸣器信号线插在右排的 G3
+#define SMOKE_PIN     2        // MQ 烟雾传感器模拟线插在右排的 G2
+#define ETH_CS_PIN    14       // W5500 的 SCS 片选线，插在右排的 G14
+
+// 有线网卡物理唯一 MAC 地址
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; 
+
+// 🌐 现场无线 Wi-Fi 配置（灾备通道）
+const char* ssid     = "iPhone";
+const char* password = "66666666";
+
+// 🌐 目标 Mac 的通信矩阵
+// 有线与无线是**两个不同的地址**，别再共用一个（这是之前有线连不上的根因）：
+//   · 无线灾备：Mac 在 iPhone 热点里的地址 + 5011 端口
+const char* wifiServerIP   = "172.20.10.10";
+const int   wifiServerPort = 5011;
+//   · 有线优先：板子直连 Mac 的那根网线，两端都必须是静态 IP、同一网段
+//     Mac 端先执行一次（要管理员密码）：
+//       sudo networksetup -setmanual "USB 10/100/1000 LAN" 192.168.1.20 255.255.255.0
+const char* ethServerIP   = "192.168.1.20";
+const int   ethServerPort = 8787;
+
+// W5500 有线网卡的静态地址（与 Mac 的 192.168.1.20 同网段）
+IPAddress ethIp(192, 168, 1, 50);
+IPAddress ethSubnet(255, 255, 255, 0);
+// 关键：有线这条**不给默认网关**（0.0.0.0）。
+// 否则 W5500 会抢走默认路由，Wi-Fi 灾备那条反而发不出去；
+// Mac 就在同一网段，同网段通信靠 ARP 直达，本来也不需要网关。
+IPAddress noGateway(0, 0, 0, 0);
+
+const char* imagePath   = "/upload";
+const char* thermalPath = "/upload_thermal";
+
+#define SERVICE_UUID "7c2b8e7a-6f4d-4a9a-9b1f-2d3e4f5a6b7c"
+
+// ==================== 2. 全局对象与容灾状态位 ====================
+Adafruit_MLX90640 mlx;
+float mlxFrame[32 * 24]; 
+BLEAdvertising *pAdvertising;
+bool isFireConfirmed = false; 
+bool eth_connected = false;    // 有线网网线物理状态连通标志
+
+// GOOUUU ESP32-S3-CAM V1.5 专属相机引脚映射
+#define PWDN_GPIO_NUM     42     
+#define RESET_GPIO_NUM    -1     
+#define XCLK_GPIO_NUM     15     
+#define SIOD_GPIO_NUM     4      
+#define SIOC_GPIO_NUM     5      
+#define Y9_GPIO_NUM       16     
+#define Y8_GPIO_NUM       17     
+#define Y7_GPIO_NUM       18     
+#define Y6_GPIO_NUM       12     
+#define Y5_GPIO_NUM       10     
+#define Y4_GPIO_NUM       8      
+#define Y3_GPIO_NUM       9      
+#define Y2_GPIO_NUM       11     
+#define VSYNC_GPIO_NUM    6      
+#define HREF_GPIO_NUM     7      
+#define PCLK_GPIO_NUM     13     
+
+// 🟢 一次 POST：有线和无线共用同一段 HTTP 逻辑，只是目标地址不同。
+// 返回 gotYes —— 只有 Mac 回了 "YES" 才算"确诊火灾"，蜂鸣器才准响。
+struct PostResult { bool connected; bool gotYes; };
+
+template <typename Client>
+PostResult postTo(Client& client, const char* host, int port, const char* path,
+                  uint8_t* payload, size_t payload_len, bool is_json) {
+    PostResult result = { false, false };
+    if (!client.connect(host, port)) return result;
+    result.connected = true;
+
+    client.print("POST "); client.print(path); client.println(" HTTP/1.1");
+    client.print("Host: "); client.println(host);
+    client.println(is_json ? "Content-Type: application/json" : "Content-Type: image/jpeg");
+    client.print("Content-Length: "); client.println(payload_len);
+    client.println("Connection: close");
+    client.println();
+    client.write(payload, payload_len);
+    client.flush();
+
+    // 实时接收 Mac 的终审答复（/upload 命中火灾时会回恰好 "YES"）
+    unsigned long timeout = millis();
+    while (client.connected() && millis() - timeout < 4000) {
+        if (client.available()) {
+            String line = client.readStringUntil('\r');
+            if (line.indexOf("YES") != -1) result.gotYes = true;
+        }
+    }
+    client.stop();
+    return result;
+}
+
+// 🟢 核心智能路由：优先走有线，连不上或网线断开时自动降级到无线
+bool sendNativePost(const char* path, uint8_t* payload, size_t payload_len, bool is_json) {
+    eth_connected = (Ethernet.linkStatus() == LinkON);
+
+    // 🚀 策略一：物理有线（W5500 直连 Mac，走静态 IP）
+    if (eth_connected) {
+        EthernetClient ethClient;
+        PostResult wired = postTo(ethClient, ethServerIP, ethServerPort, path, payload, payload_len, is_json);
+        if (wired.connected) {
+            Serial.println(String("【通路：W5500 有线网线】数据已送入 Mac")
+                           + (wired.gotYes ? "，终审答复 YES" : ""));
+            return wired.gotYes;
+        }
+        Serial.println("【有线】网线在但连不上 Mac（检查 Mac 是否已设 192.168.1.20），改走无线…");
+    }
+
+    // 🌪️ 策略二：无线灾备
+    if (WiFi.status() == WL_CONNECTED) {
+        WiFiClient wifiClient;
+        PostResult wifi = postTo(wifiClient, wifiServerIP, wifiServerPort, path, payload, payload_len, is_json);
+        if (wifi.connected) {
+            Serial.println("【⚠️通路切换：Wi-Fi 无线灾备】已自动切回无线通道发射！");
+            return wifi.gotYes;
+        }
+    }
+    return false;
+}
+
+void uploadThermalData(float* frameBuffer, float maxTemp) {
+    DynamicJsonDocument doc(16384); 
+    doc["max_temp"] = maxTemp;
+    JsonArray dataArray = doc.createNestedArray("sensor_data");
+    for (int i = 0; i < 768; i++) dataArray.add(frameBuffer[i]);
+    
+    String jsonString;
+    serializeJson(doc, jsonString);
+    
+    sendNativePost(thermalPath, (uint8_t*)jsonString.c_str(), jsonString.length(), true);
+}
+
+void startBlinkingBlerBroadcast(int smokeValue, float maxTemp) {
+    pAdvertising->stop(); 
+    uint8_t payload[4];
+    payload[0] = (smokeValue >> 8) & 0xFF; 
+    payload[1] = smokeValue & 0xFF;        
+    payload[2] = (uint8_t)maxTemp;         
+    payload[3] = 0xAA;                     
+
+    BLEAdvertisementData advData;
+    std::string strData((char*)payload, 4);
+    advData.setManufacturerData(strData);
+    pAdvertising->setAdvertisementData(advData);
+    pAdvertising->start(); 
+    Serial.println("【无线广播防线】已向楼道内手机散播无网自救自引导信标包！");
+}
+
+void initCamera() {
+    camera_config_t config;
+    config.pin_d0 = Y2_GPIO_NUM; config.pin_d1 = Y3_GPIO_NUM;
+    config.pin_d2 = Y4_GPIO_NUM; config.pin_d3 = Y5_GPIO_NUM;
+    config.pin_d4 = Y6_GPIO_NUM; config.pin_d5 = Y7_GPIO_NUM;
+    config.pin_d6 = Y8_GPIO_NUM; config.pin_d7 = Y9_GPIO_NUM;
+    config.pin_xclk = XCLK_GPIO_NUM; config.pin_pclk = PCLK_GPIO_NUM;
+    config.pin_vsync = VSYNC_GPIO_NUM; config.pin_href = HREF_GPIO_NUM;
+    config.pin_sccb_sda = SIOD_GPIO_NUM; config.pin_sccb_scl = SIOC_GPIO_NUM;
+    config.pin_pwdn = PWDN_GPIO_NUM; config.pin_reset = RESET_GPIO_NUM;
+    config.xclk_freq_hz = 20000000; config.frame_size = FRAMESIZE_VGA;
+    config.pixel_format = PIXFORMAT_YUV422; config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+    config.fb_location = CAMERA_FB_IN_PSRAM; config.jpeg_quality = 12; config.fb_count = 1;
+
+    esp_err_t err = esp_camera_init(&config);
+    if (err != ESP_OK) Serial.printf("OV2640 摄像头初始化失败: 0x%x\n", err);
+    else Serial.println("OV2640 摄像头初始化成功！");
+}
+
+void initMLX90640() {
+    Wire.begin(I2C_SDA, I2C_SCL, 400000); 
+    if (!mlx.begin(MLX90640_I2CADDR_DEFAULT, &Wire)) Serial.println("未找到 MLX90640 热成像模块！");
+    else {
+        mlx.setMode(MLX90640_CHESS); mlx.setResolution(MLX90640_ADC_18BIT); mlx.setRefreshRate(MLX90640_2_HZ); 
+        Serial.println("MLX90640 热成像初始化成功！");
+    }
+}
+
+bool uploadImageAndGetAIResult() {
+    camera_fb_t * fb = esp_camera_fb_get();
+    if (!fb) return false;
+
+    uint8_t * jpeg_buf = NULL; size_t jpeg_len = 0; bool is_converted = false;
+    if (fb->format == PIXFORMAT_YUV422) is_converted = frame2jpg(fb, 80, &jpeg_buf, &jpeg_len); 
+
+    size_t final_len = is_converted ? jpeg_len : fb->len;
+    uint8_t* final_buf = is_converted ? jpeg_buf : fb->buf;
+
+    bool ai_verdict = false;
+    if (final_buf && final_len > 0) {
+        ai_verdict = sendNativePost(imagePath, final_buf, final_len, false);
+    }
+
+    if (is_converted && jpeg_buf) free(jpeg_buf); 
+    esp_camera_fb_return(fb);
+    return ai_verdict;
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, HIGH); // 👈 核心修改：开机先给高电平，强行让低电平触发的蜂鸣器闭嘴、保持静音！
+    
+    // ... 其他初始化保持不动 ...
+
+    initCamera();
+    initMLX90640();
+
+    // 🌐 通道 A：唤醒 W5500 硬件有线网口总线
+    // 直连 Mac 这条线上没有 DHCP，必须用静态 IP（原来 Ethernet.begin(mac) 走 DHCP 必然失败，
+    // 这也正是"网线插着但一直显示不通"的原因）。
+    Serial.println("正在拉通物理有线网口（W5500 静态 IP 初始化）...");
+    Ethernet.init(ETH_CS_PIN);
+    Ethernet.begin(mac, ethIp, noGateway, noGateway, ethSubnet);
+    delay(200);
+    if (Ethernet.hardwareStatus() == EthernetNoHardware || Ethernet.linkStatus() == LinkOFF) {
+        Serial.println("【有线】网线未接入或 W5500 无响应，本次先走无线。");
+        eth_connected = false;
+    } else {
+        Serial.print("【有线】W5500 就绪，本机 IP: "); Serial.print(Ethernet.localIP());
+        Serial.print("  目标 Mac: "); Serial.print(ethServerIP); Serial.print(":"); Serial.println(ethServerPort);
+        eth_connected = true;
+    }
+
+    // 🌐 通道 B：并发连通备用无线 Wi-Fi
+    Serial.print("正在并发连通备用无线 Wi-Fi: "); Serial.println(ssid);
+    WiFi.begin(ssid, password);
+
+    BLEDevice::init("FireAegis_Sentry");
+    pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+
+    Serial.println("FireAegis 边缘双轨冗余防御线全面就绪！");
+}
+
+void loop() {
+    int smokeVal = analogRead(SMOKE_PIN);
+    float maxTemp = 0.0;
+    if (mlx.getFrame(mlxFrame) == 0) {
+        for (int i = 0; i < 768; i++) { if (mlxFrame[i] > maxTemp) maxTemp = mlxFrame[i]; }
+    }
+
+    Serial.printf("常态数据 -> 烟雾值: %d | 红外最高温: %.2f°C | 有线链路: %s\n", 
+                  smokeVal, maxTemp, (Ethernet.linkStatus() == LinkON) ? "ON (优先)" : "OFF (断开)");
+
+    // 边缘端双指标容灾判定
+    if ((smokeVal > 200 || maxTemp > 32.0) && !isFireConfirmed) {
+        uploadThermalData(mlxFrame, maxTemp);
+        if (uploadImageAndGetAIResult()) {
+            isFireConfirmed = true; 
+        }
+    }
+
+        // 4. 执行 AI 终审后的联动控制（严格听从大模型指挥防线）
+    if (isFireConfirmed) { // 👈 只有大模型回传 YES，isFireConfirmed 变为 true 时才准进来！
+        digitalWrite(BUZZER_PIN, LOW); // 👈 拉低电平，触发你的蜂鸣器破空狂鸣！
+        Serial.println("🚨🚨🚨【FireAegis 最终大警报】多模态大模型终审确诊火灾！授权物理蜂鸣器轰鸣！");
+        startBlinkingBlerBroadcast(smokeVal, maxTemp); 
+    } else {
+        // 🟢 只要大模型没有判定为真火灾，或者判定为误报（NO），全盘强制静音！
+        digitalWrite(BUZZER_PIN, HIGH); // 👈 保持高电平，锁死蜂鸣器让它绝对闭嘴！
+        pAdvertising->stop();           
+    }
+
+
+    delay(2000); 
+}
