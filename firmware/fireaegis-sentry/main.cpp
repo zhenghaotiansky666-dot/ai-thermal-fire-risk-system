@@ -241,8 +241,20 @@ void setup() {
     Ethernet.init(ETH_CS_PIN);
     Ethernet.begin(mac, ethIp, noGateway, noGateway, ethSubnet);
     delay(200);
-    if (Ethernet.hardwareStatus() == EthernetNoHardware || Ethernet.linkStatus() == LinkOFF) {
-        Serial.println("【有线】网线未接入或 W5500 无响应，本次先走无线。");
+    // 有线自检：把原始状态码打出来，一眼分清是"找不到芯片"还是"网线没通"
+    //   hardwareStatus: 0=没找到芯片(SPI通信失败/没供电) 3=W5500 正常
+    //   linkStatus    : 1=链路接通(LinkON)             2=链路断开(LinkOFF)
+    const uint8_t ethHw = static_cast<uint8_t>(Ethernet.hardwareStatus());
+    const uint8_t ethLk = static_cast<uint8_t>(Ethernet.linkStatus());
+    Serial.printf("【有线自检】hardwareStatus=%u（0=找不到W5500芯片 / 3=W5500正常）", ethHw);
+    Serial.printf("  linkStatus=%u（1=网线接通 / 2=网线断开）\n", ethLk);
+    if (ethHw == 0) {
+        Serial.println("→ 现象：ESP32 通过 SPI 读不到 W5500。查：①W5500 的 3.3V/GND ②CS=GPIO14 ③SPI 引脚");
+        Serial.println("   重点：ESP32-S3 默认 SPI 是 GPIO11(MOSI)/GPIO12(SCK)/GPIO13(MISO)，");
+        Serial.println("         而本固件摄像头正好用了 GPIO11/12/13 —— 若 W5500 也接在这三根上就是冲突。");
+    }
+    if (ethHw == 0 || ethLk == 2) {
+        Serial.println("【有线】本次先自动降级走无线。");
         eth_connected = false;
     } else {
         Serial.print("【有线】W5500 就绪，本机 IP: "); Serial.print(Ethernet.localIP());
