@@ -101,13 +101,18 @@ PostResult postTo(Client& client, const char* host, int port, const char* path,
     client.println("Connection: close");
     client.println();
 
-    // ★ 关键：W5500 每个 socket 的发送缓冲只有 2KB，库的 write() 在大包时**只会送出去一部分就返回**。
-    //   原来只调用一次 write()，所以照片/热像矩阵全都卡在 ~2KB，服务端永远收不到完整请求。
-    //   这里必须循环补齐，直到全部送出（或连续 8 秒没有进展才放弃）。
+    // ★ 关键：W5500 每个 socket 的发送缓冲只有 2KB。
+    //   实测（2026-10-08 抓包）：固件声明 Content-Length: 9155 / 22919，
+    //   但服务端只收到 ~2KB 就断了 —— 单次 write() 传整个大包时，
+    //   库会把数据一次塞进 2KB 的 socket 缓冲，超出的部分被静默丢弃，
+    //   而 write() 的返回值又不可靠（不同库版本表现不一致）。
+    //   解决办法：**每次只发 1KB**（远小于 2KB 缓冲），循环推进。
+    const size_t CHUNK = 1024;
     size_t sent = 0;
     unsigned long lastProgress = millis();
     while (sent < payload_len) {
-        size_t n = client.write(payload + sent, payload_len - sent);
+        size_t want = (payload_len - sent) > CHUNK ? CHUNK : (payload_len - sent);
+        size_t n = client.write(payload + sent, want);
         if (n > 0) {
             sent += n;
             lastProgress = millis();
@@ -117,7 +122,7 @@ PostResult postTo(Client& client, const char* host, int port, const char* path,
         }
     }
     client.flush();
-    Serial.printf("【发送】%s 实际送出 %u / %u 字节\n", path, (unsigned)sent, (unsigned)payload_len);
+    Serial.printf("【发送】%s 实际送出 %u / %u 字节（%u 字节小块）\n", path, (unsigned)sent, (unsigned)payload_len, (unsigned)CHUNK);
 
     // 没送完就别等了，直接判失败（省得白等 4 秒）
     if (sent < payload_len) {

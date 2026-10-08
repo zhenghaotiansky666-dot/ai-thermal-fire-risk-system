@@ -212,7 +212,21 @@ const host = readArg('--host', '0.0.0.0')
 const strictPort = hasFlag('--strict-port')
 const visionUrl = String(readArg('--vision-url', process.env.TG_VISION_URL || '')).replace(/\/$/, '')
 const visionConf = Number(readArg('--vision-conf', '0.5'))
-const yesTemp = Number(readArg('--yes-temp', '70'))
+// 终审阈值优先级：--yes-temp 参数 > 环境变量 TG_YES_TEMP > ai-config.json 的 yesTemp > 70
+// 注意：这和固件里的"发送触发阈值"（烟雾>200 或 温度>32）是两回事——
+// 固件那个决定"什么时候发数据"，这个决定"收到之后回 YES 还是 NO"。
+function yesTempFromConfig() {
+  for (const candidate of ['public/ai-config.json', 'ai-config.json']) {
+    try {
+      const config = JSON.parse(readFileSync(candidate, 'utf8'))
+      if (Number.isFinite(Number(config.yesTemp))) return Number(config.yesTemp)
+    } catch {}
+  }
+  return null
+}
+const yesTemp = Number(readArg('--yes-temp',
+  Number.isFinite(Number(process.env.TG_YES_TEMP)) ? process.env.TG_YES_TEMP
+    : (yesTempFromConfig() ?? 70)))
 const outDir = resolve(readArg('--out', 'output/hardware'))
 const alwaysYes = hasFlag('--always-yes')
 const keepFrames = Number(readArg('--keep', '20'))
@@ -801,9 +815,18 @@ function watchConnection(socket) {
   const from = clientAddress({ socket })
   const startedAt = Date.now()
   let bytes = 0
-  socket.on('data', (chunk) => { bytes += chunk.length })
+  // 只留开头一段：用来核对板子声明的 Content-Length 和实际发出的字节数
+  let head = Buffer.alloc(0)
+  socket.on('data', (chunk) => {
+    bytes += chunk.length
+    if (head.length < 400) head = Buffer.concat([head, chunk.subarray(0, 400 - head.length)])
+  })
   socket.on('close', () => {
     console.log(`【原始连接】${from} 关闭：共收到 ${bytes} 字节，存活 ${Date.now() - startedAt} ms`)
+    if (from !== '127.0.0.1' && head.length) {
+      const text = head.toString('utf8').replace(/\r/g, '').split('\n').slice(0, 8).join(' | ')
+      console.log(`【请求头】${from}：${text.slice(0, 300)}`)
+    }
   })
   console.log(`【原始连接】${from} 已建立`)
 }
