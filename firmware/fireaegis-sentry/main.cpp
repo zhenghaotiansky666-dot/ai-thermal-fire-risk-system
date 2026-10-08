@@ -19,6 +19,13 @@
 #define BUZZER_PIN    3        // 蜂鸣器信号线插在右排的 G3
 #define SMOKE_PIN     2        // MQ 烟雾传感器模拟线插在右排的 G2
 #define ETH_CS_PIN    14       // W5500 的 SCS 片选线，插在右排的 G14
+// W5500 的 SPI 三根线：**必须和实际接线一致**。
+// 为什么不能省：ESP32-S3 的默认 SPI 是 GPIO11(MOSI)/GPIO12(SCK)/GPIO13(MISO)，
+// 而本固件的摄像头正好占用了 11/12/13，所以 W5500 必须挪到空闲引脚并显式重映射
+// （setup 里的 SPI.begin(SCK, MISO, MOSI, CS)）。
+#define ETH_SCK_PIN   39       // W5500 时钟线（不能用 12）
+#define ETH_MISO_PIN  40       // W5500 主入从出（不能用 13）
+#define ETH_MOSI_PIN  41       // W5500 主出从入（不能用 11）
 
 // 有线网卡物理唯一 MAC 地址
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; 
@@ -237,8 +244,29 @@ void setup() {
     // 直连 Mac 这条线上没有 DHCP，必须用静态 IP（原来 Ethernet.begin(mac) 走 DHCP 必然失败，
     // 这也正是"网线插着但一直显示不通"的原因）。
     Serial.println("正在拉通物理有线网口（W5500 静态 IP 初始化）...");
-    SPI.begin();                 // W5500 走 SPI，先把总线拉起来
+    // W5500 走 SPI：显式重映射到实际接线的那几根，避开摄像头的 11/12/13
+    SPI.begin(ETH_SCK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
     Ethernet.init(ETH_CS_PIN);
+    Serial.printf("【有线自检】SPI 引脚: SCK=%d MISO=%d MOSI=%d CS=%d\n", ETH_SCK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
+
+    // ── W5500 直达检测：直接读它的版本寄存器（地址 0x0039，正常应返回 0x04）──
+    // 这一步绕开所有库逻辑：读到 0x04 就说明"SPI 接线 + 供电"没问题；
+    // 读到 0x00/0xFF 就说明芯片根本没被访问到（接线/供电/引脚）。
+    pinMode(ETH_CS_PIN, OUTPUT);
+    digitalWrite(ETH_CS_PIN, HIGH);
+    delay(2);
+    digitalWrite(ETH_CS_PIN, LOW);
+    delayMicroseconds(5);
+    SPI.transfer(0x00);   // 读操作 + 通用寄存器块
+    SPI.transfer(0x00);   // 地址高字节
+    SPI.transfer(0x39);   // 地址低字节 = 0x0039 (VERSIONR)
+    const uint8_t w5500Version = SPI.transfer(0x00);
+    digitalWrite(ETH_CS_PIN, HIGH);
+    Serial.printf("【W5500 直读】版本寄存器 = 0x%02X（正常应为 0x04）\n", w5500Version);
+    if (w5500Version != 0x04) {
+        Serial.println("→ SPI 底座不通：查 W5500 的 VCC=3.3V、GND 共地、SCK/MISO/MOSI/CS 四根线是否插实");
+    }
+
     Ethernet.begin(mac, ethIp, noGateway, noGateway, ethSubnet);
     delay(200);
     // 有线自检：把原始状态码打出来，一眼分清是"找不到芯片"还是"网线没通"
