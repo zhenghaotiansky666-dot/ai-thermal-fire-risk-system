@@ -193,7 +193,17 @@ function portFromConfig() {
   }
   return null
 }
-const portFromArgs = args.includes('--port') ? Number(readArg('--port', String(DEFAULT_HARDWARE_PORT))) : null
+// --port 支持逗号列表（例如 --port 8787,5011）：固件可能被烧成别的端口，
+// 同时听几个端口就不用为了换个端口去重烧固件。
+function parsePorts(value) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item) && item > 0 && item < 65536)
+}
+const portsFromArgs = args.includes('--port') ? parsePorts(readArg('--port', String(DEFAULT_HARDWARE_PORT))) : []
+const portFromArgs = portsFromArgs[0] ?? null
+const extraPorts = portsFromArgs.slice(1)
 const port = portFromArgs
   ?? (Number.isFinite(Number(process.env.TG_HARDWARE_PORT)) ? Number(process.env.TG_HARDWARE_PORT) : null)
   ?? portFromConfig()
@@ -207,6 +217,8 @@ const outDir = resolve(readArg('--out', 'output/hardware'))
 const alwaysYes = hasFlag('--always-yes')
 const keepFrames = Number(readArg('--keep', '20'))
 const printFirmware = hasFlag('--print-firmware')
+// 诊断用：把每一条 TCP 连接的原始字节数打出来（分清"连上了但没发数据"和"发了但服务没解析"）
+const logConnections = hasFlag('--log-connections')
 // 网线接入：指定用哪张网卡的地址写进固件（不指定就自动挑有线那张）
 const preferInterface = readArg('--interface', '')
 const medium = readArg('--medium', '')
@@ -616,8 +628,13 @@ async function tick(){
 tick(); setInterval(tick, 2000);
 </script></main></body></html>`
 
-const server = createServer(async (request, response) => {
+async function handleRequest(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`)
+  // 每一条进来的请求都打一行：板子有没有连上、连到哪个端口、发的什么，一眼可见
+  const from = clientAddress(request)
+  if (request.method !== 'OPTIONS' && url.pathname !== '/') {
+    console.log(`[${new Date().toLocaleTimeString('zh-CN', { hour12: false })}] ${request.method} ${url.pathname} ← ${from}`)
+  }
   if (request.method === 'OPTIONS') {
     response.writeHead(204, cors)
     response.end()
@@ -772,7 +789,25 @@ const server = createServer(async (request, response) => {
   }
 
   json(response, 404, { ok: false, error: 'not-found', routes: ['POST /upload', 'POST /upload_thermal', 'GET /latest'] })
-})
+}
+
+// 主端口 + 额外端口共用同一个请求处理函数（同一份内存与落盘数据）
+const server = createServer(handleRequest)
+const extraServers = []
+
+// 原始连接日志：只看每条第 4 层连接收了多少字节、活了多久
+function watchConnection(socket) {
+  if (!logConnections) return
+  const from = clientAddress({ socket })
+  const startedAt = Date.now()
+  let bytes = 0
+  socket.on('data', (chunk) => { bytes += chunk.length })
+  socket.on('close', () => {
+    console.log(`【原始连接】${from} 关闭：共收到 ${bytes} 字节，存活 ${Date.now() - startedAt} ms`)
+  })
+  console.log(`【原始连接】${from} 已建立`)
+}
+server.on('connection', watchConnection)
 
 await mkdir(outDir, { recursive: true }).catch(() => {})
 
@@ -817,6 +852,7 @@ function printBanner() {
   }
   console.log(`  可见光上传：POST http://<本机IP>:${activePort}/upload        （固件 serverUrl）`)
   console.log(`  热像上传：  POST http://<本机IP>:${activePort}/upload_thermal （固件 thermalServerUrl）`)
+  if (extraPorts.length) console.log(`  同时监听：  ${extraPorts.join('、')}（固件烧成这些端口也能直接连；被占用的会自动跳过）`)
   console.log(`  观察页面：  http://127.0.0.1:${activePort}/`)
   console.log(`  终审策略：  ${visionUrl ? `YOLO 视觉服务 ${visionUrl}（阈值 ${visionConf}）` : `热像阈值 ${yesTemp}°C`}${alwaysYes ? ' · 强制 YES（演示）' : ''}`)
   console.log(`  落盘目录：  ${outDir}`)
@@ -873,5 +909,36 @@ if (isCli) {
     console.error(`端口 ${activePort} 无法监听：${error.message}`)
     process.exit(1)
   })
-  server.listen(activePort, host, printBanner)
+  server.listen(activePort, host, () => {
+    printBanner()
+    // 额外端口：固件里可能烧的是 5011 / 5000 等别的端口，这里一起听上。
+    // 被占用的（例如 macOS 的 5000 被隔空播放占着）就跳过并说明，不影响主端口。
+    extraPorts.forEach((extra) => {
+      if (extra === activePort) return
+      const probe = createProbeServer()
+      probe.once('error', () => {
+        console.log(`ℹ️ 额外端口 ${extra} 被占用或不可用，已跳过（主端口 ${activePort} 正常）`)
+      })
+      probe.once('listening', () => {
+        probe.close(() => {
+          const extraServer = createServer(handleRequest)
+          extraServer.on('connection', watchConnection)
+          extraServer.once('error', (error) => {
+            console.log(`ℹ️ 额外端口 ${extra} 监听失败：${error.message}`)
+          })
+          extraServer.listen(extra, host, () => {
+            extraServers.push(extraServer)
+            console.log(`同时监听端口 ${extra}（固件烧的是这个端口也能直接连上）`)
+          })
+        })
+      })
+      probe.listen(extra, host)
+    })
+  })
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, () => {
+      extraServers.forEach((item) => { try { item.close() } catch {} })
+      server.close(() => process.exit(0))
+    })
+  }
 }

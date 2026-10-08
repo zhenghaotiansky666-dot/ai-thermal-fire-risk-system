@@ -97,11 +97,33 @@ PostResult postTo(Client& client, const char* host, int port, const char* path,
     client.print("POST "); client.print(path); client.println(" HTTP/1.1");
     client.print("Host: "); client.println(host);
     client.println(is_json ? "Content-Type: application/json" : "Content-Type: image/jpeg");
-    client.print("Content-Length: "); client.println(payload_len);
+    client.print("Content-Length: "); client.println((unsigned int)payload_len);
     client.println("Connection: close");
     client.println();
-    client.write(payload, payload_len);
+
+    // ★ 关键：W5500 每个 socket 的发送缓冲只有 2KB，库的 write() 在大包时**只会送出去一部分就返回**。
+    //   原来只调用一次 write()，所以照片/热像矩阵全都卡在 ~2KB，服务端永远收不到完整请求。
+    //   这里必须循环补齐，直到全部送出（或连续 8 秒没有进展才放弃）。
+    size_t sent = 0;
+    unsigned long lastProgress = millis();
+    while (sent < payload_len) {
+        size_t n = client.write(payload + sent, payload_len - sent);
+        if (n > 0) {
+            sent += n;
+            lastProgress = millis();
+        } else {
+            if (millis() - lastProgress > 8000) break;
+            delay(5);
+        }
+    }
     client.flush();
+    Serial.printf("【发送】%s 实际送出 %u / %u 字节\n", path, (unsigned)sent, (unsigned)payload_len);
+
+    // 没送完就别等了，直接判失败（省得白等 4 秒）
+    if (sent < payload_len) {
+        client.stop();
+        return result;
+    }
 
     // 实时接收 Mac 的终审答复（/upload 命中火灾时会回恰好 "YES"）
     unsigned long timeout = millis();
