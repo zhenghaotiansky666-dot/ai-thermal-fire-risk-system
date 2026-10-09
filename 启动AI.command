@@ -58,6 +58,7 @@ if [ -n "$OLLAMA_BIN" ] && [ -x "$OLLAMA_BIN" ]; then
   if ! curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
     echo "  启动 ollama serve（后台）…"
     nohup "$OLLAMA_BIN" serve > "$ROOT/ollama.log" 2>&1 &
+    disown $! 2>/dev/null || true   # 从 shell 作业表移除，关窗口也不会被带走
     for _ in $(seq 1 20); do
       curl -s -m 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break
       sleep 1
@@ -105,6 +106,7 @@ else
       echo "· 启动视觉服务（YOLO + ai/best.pt，端口 8000）…"
       nohup "$PY" "$AI_DIR/server.py" --model "$AI_DIR/best.pt" --port 8000 --no-camera \
         > "$ROOT/视觉服务.log" 2>&1 &
+      disown $! 2>/dev/null || true   # 同上：关掉这个窗口后视觉服务继续跑
       for _ in $(seq 1 30); do
         curl -s -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1 && break
         sleep 1
