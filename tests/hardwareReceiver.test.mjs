@@ -8,6 +8,7 @@ import {
   clientAddress,
   decideFire,
   encodePng,
+  YES_TEMP,
   extractImage,
   parseMultipart,
   parseCarrier,
@@ -81,11 +82,15 @@ console.log('[4] 热像渲染成 PNG')
 
 console.log('[5] 终审决策（固件只看 YES / NO）')
 {
-  const cool = await decideFire({ jpegBuffer: JPEG, thermal: { at: Date.now(), maxTemp: 34 } })
-  check('热像 34°C → NO', cool.answer === 'NO' && cool.source === 'thermal')
+  // 阈值是可配置的（配置文件里的 yesTemp，演示时可能调成 32），
+  // 所以测试用"阈值 -10°C"来构造一个必然低于阈值的温度，而不是写死 34。
+  const coolTemp = Math.max(0, YES_TEMP - 10)
+  const cool = await decideFire({ jpegBuffer: JPEG, thermal: { at: Date.now(), maxTemp: coolTemp } })
+  check(`热像 ${coolTemp}°C（低于阈值 ${YES_TEMP}°C）→ NO`, cool.answer === 'NO' && cool.source === 'thermal')
 
-  const hot = await decideFire({ jpegBuffer: JPEG, thermal: { at: Date.now(), maxTemp: 86 } })
-  check('热像 86°C → YES', hot.answer === 'YES' && hot.source === 'thermal')
+  const hotTemp = YES_TEMP + 20
+  const hot = await decideFire({ jpegBuffer: JPEG, thermal: { at: Date.now(), maxTemp: hotTemp } })
+  check(`热像 ${hotTemp}°C（高于阈值）→ YES`, hot.answer === 'YES' && hot.source === 'thermal')
 
   const stale = await decideFire({ jpegBuffer: JPEG, thermal: { at: Date.now() - 60000, maxTemp: 99 } })
   check('热像数据过期（>30 秒）→ 回落到保守 NO', stale.answer === 'NO' && stale.source === 'fallback')

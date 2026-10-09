@@ -130,7 +130,8 @@ export function hardwarePortKinds() {
       const device = /Device:\s*(\S+)/.exec(block)?.[1]?.trim() ?? ''
       if (!device) continue
       if (/wi-?fi|airport|无线/i.test(port)) kinds[device] = 'wireless'
-      else if (/ethernet|雷雳|thunderbolt|usb\s*10\/100|lan/i.test(port)) kinds[device] = 'wired'
+      // 有线：除了常见叫法，还要认 USB 网卡芯片名（扩展坞里常见 AX88179A / RTL8153 / ASIX 等）
+      else if (/ethernet|雷雳|thunderbolt|usb|lan|ax88|asix|rtl81|realtek/i.test(port)) kinds[device] = 'wired'
       else kinds[device] = 'other'
     }
     return kinds
@@ -227,6 +228,8 @@ function yesTempFromConfig() {
 const yesTemp = Number(readArg('--yes-temp',
   Number.isFinite(Number(process.env.TG_YES_TEMP)) ? process.env.TG_YES_TEMP
     : (yesTempFromConfig() ?? 70)))
+// 导出实际生效的终审阈值：测试和被其它脚本引用时不用再猜
+export const YES_TEMP = yesTemp
 const outDir = resolve(readArg('--out', 'output/hardware'))
 const alwaysYes = hasFlag('--always-yes')
 const keepFrames = Number(readArg('--keep', '20'))
