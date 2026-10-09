@@ -1,0 +1,14 @@
+# 数据集绝对路径（使用正斜杠）
+path: D:/ai/dataset
+
+# 训练集和验证集相对 path 的路径
+train: images/train
+val: images/val
+
+# 类别数量
+nc: 2
+
+# 类别名称（0 代表火，1 代表烟）
+names:
+  0: fire
+  1: smoke

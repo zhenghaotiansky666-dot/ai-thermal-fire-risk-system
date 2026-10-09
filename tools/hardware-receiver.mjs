@@ -501,6 +501,8 @@ export function parseThermalPayload(buffer, contentType) {
 export async function decideFire({ jpegBuffer, thermal }) {
   if (alwaysYes) return { answer: 'YES', source: 'force', reason: '启动时指定了 --always-yes（演示用）' }
 
+  // 视觉终审（队友训练的 YOLOv8 best.pt）：火焰/烟雾置信度
+  let vision = null
   if (visionUrl && jpegBuffer) {
     try {
       const response = await fetch(`${visionUrl}/detect`, {
@@ -514,24 +516,38 @@ export async function decideFire({ jpegBuffer, thermal }) {
         const flame = Number(payload.flame ?? payload.fire ?? 0)
         const smoke = Number(payload.smoke ?? 0)
         const hit = flame >= visionConf || (flame >= 0.6 && smoke >= 0.5)
-        return {
-          answer: hit ? 'YES' : 'NO',
-          source: 'yolo',
+        vision = {
+          hit,
           reason: `视觉：火焰 ${(flame * 100).toFixed(0)}% · 烟雾 ${(smoke * 100).toFixed(0)}%（阈值 ${(visionConf * 100).toFixed(0)}%）`,
         }
       }
     } catch (error) {
-      // 视觉服务不可用时继续往下走热像兜底，不抛错
+      // 视觉服务不可用时继续走热像兜底，不抛错
     }
   }
 
-  if (thermal && Date.now() - thermal.at < 30000) {
-    const hit = thermal.maxTemp >= yesTemp
+  // 两路独立证据，**任一命中即报警**（安全优先）：
+  //   · 视觉看到明火/浓烟 → YES（火源离热像节点远、面积小时也不会漏）
+  //   · 热像超过阈值       → YES（镜头被浓烟挡住、或火在盲区时也不会漏）
+  // 这样任一路失效都还有另一路兜底，而"两路都没命中"才返回 NO。
+  if (vision?.hit) {
+    return { answer: 'YES', source: 'yolo', reason: vision.reason }
+  }
+
+  const freshThermal = thermal && Date.now() - thermal.at < 30000
+  if (freshThermal && thermal.maxTemp >= yesTemp) {
     return {
-      answer: hit ? 'YES' : 'NO',
+      answer: 'YES',
       source: 'thermal',
-      reason: `热像最高温 ${thermal.maxTemp.toFixed(1)}°C（阈值 ${yesTemp}°C）`,
+      reason: `热像最高温 ${thermal.maxTemp.toFixed(1)}°C（阈值 ${yesTemp}°C）${vision ? '；视觉本轮未发现明火' : ''}`,
     }
+  }
+
+  if (vision) {
+    return { answer: 'NO', source: 'yolo', reason: `${vision.reason}；热像未超阈值，判定无火情` }
+  }
+  if (freshThermal) {
+    return { answer: 'NO', source: 'thermal', reason: `热像最高温 ${thermal.maxTemp.toFixed(1)}°C（阈值 ${yesTemp}°C）` }
   }
 
   return {

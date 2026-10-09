@@ -101,7 +101,9 @@ async function serveStatic(request, response, pathname) {
 }
 
 async function proxyAi(request, response) {
-  const suffix = request.url.replace(/^\/ai/, '')
+  // 两种写法都兼容：/ai/chat/completions（推荐）与 /ai/v1/chat/completions
+  // 因为 upstream 已经带了 /v1，所以这里把多余的 /v1 去掉，避免变成 /v1/v1/...
+  const suffix = request.url.replace(/^\/ai/, '').replace(/^\/v1(?=\/|$)/, '')
   const target = `${upstream}${suffix}`
   const chunks = []
   for await (const chunk of request) chunks.push(chunk)
