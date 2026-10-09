@@ -59,19 +59,19 @@
         </div>
 
         <div class="card">
-          <span class="tag">离线可用</span>
+          <span class="tag">自带 AI · 离线可用</span>
           <h2>② 下载后一键启动</h2>
-          <p>把整套东西（站点 + 本地服务 + 硬件接收端 + 启动脚本）下载到电脑，解压后双击启动：</p>
+          <p>把整套东西（站点 + 本地服务 + 硬件接收端 + <strong>AI 模型与启动脚本</strong>）下载到电脑，解压后双击启动：</p>
           <ol>
-            <li>下载源码包（压缩包内已含 <code>启动电脑版.command</code> / <code>启动电脑版.bat</code>）</li>
-            <li>macOS 双击 <code>启动电脑版.command</code>，Windows 双击 <code>启动电脑版.bat</code></li>
-            <li>脚本会自动检查环境、构建站点、启动服务，并用独立窗口打开指挥端</li>
+            <li>下载 <strong>电脑版压缩包</strong>（已含 <code>启动电脑版</code> 与 <code>启动AI</code> 两组脚本）</li>
+            <li>先双击 <code>启动AI.command</code>（Windows 用 <code>启动AI.bat</code>）——自动装好并启动本地 AI</li>
+            <li>再双击 <code>启动电脑版.command</code> ——打开指挥端，右上角会显示「AI 就绪 · fireaegis:latest + YOLO」</li>
           </ol>
-          <pre id="cmd">git clone https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system.git
-cd ai-thermal-fire-risk-system
-./启动电脑版.command        # Windows: 启动电脑版.bat</pre>
+          <p class="meta">包内已带视觉模型（<code>ai/best.pt</code>，火焰/烟雾检测）与预置配置；决策模型（本地 Ollama）由启动脚本自动安装导入。
+             想要<strong>完全离线</strong>（连模型一起带走）就下 AI 离线版，约 2GB。</p>
           <div class="actions">
-            <a class="btn" href="https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system/archive/refs/heads/main.zip">下载源码包（zip）</a>
+            <a class="btn" href="https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system/releases/latest">下载电脑版（自带 AI）</a>
+            <a class="btn ghost" href="https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system/archive/refs/heads/main.zip">下载源码包</a>
             <a class="btn ghost" href="https://github.com/zhenghaotiansky666-dot/ai-thermal-fire-risk-system">打开 GitHub 仓库</a>
           </div>
         </div>

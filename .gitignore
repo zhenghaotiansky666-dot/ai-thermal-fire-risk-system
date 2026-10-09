@@ -17,3 +17,6 @@ ai/.venv/
 __pycache__/
 ai/*.gguf
 ollama-models/
+ollama离线.zip
+models/*.gguf
+Ollama-darwin.zip

@@ -1,5 +1,9 @@
 # FireAegis 本地决策模型（队友交付的 qwen2.5-3b-instruct GGUF）
-FROM /Users/zhenghaotian/ollama-models/qwen2.5-3b-instruct.gguf
+#
+# 路径是**相对包根目录**的，所以在哪个文件夹解压都能用：
+# 把 qwen2.5-3b-instruct.gguf 放在包根的 models/ 下，然后在包根执行
+#     ollama create fireaegis -f ai/Modelfile.fireaegis
+FROM ./models/qwen2.5-3b-instruct.gguf
 
 PARAMETER temperature 0.4
 PARAMETER num_ctx 4096

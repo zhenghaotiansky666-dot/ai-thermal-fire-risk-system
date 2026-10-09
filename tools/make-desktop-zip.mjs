@@ -13,14 +13,31 @@ import { resolve, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
-const outDir = resolve(process.argv[2] || 'outputs')
+const argv = process.argv.slice(2)
+// --with-model：把 1.9GB 的决策模型和 Ollama 离线安装包一起打进去（离线演示用，包会很大）
+const withModel = argv.includes('--with-model')
+const positional = argv.filter((item) => !item.startsWith('--'))
+const outDir = resolve(positional[0] || 'outputs')
 const stamp = new Date().toISOString().slice(0, 10)
-const packageName = `FireAegis-电脑版-${stamp}`
+const packageName = withModel ? `FireAegis-电脑版-AI离线版-${stamp}` : `FireAegis-电脑版-${stamp}`
 const stage = resolve('.desktop-stage', packageName)
+// 决策模型与 Ollama 离线包放在这两个位置（存在才一起打包）
+const MODEL_SRC = resolve(process.env.FIREAEGIS_MODEL_FILE || join(process.env.HOME || '', 'ollama-models', 'qwen2.5-3b-instruct.gguf'))
+// 离线版要带的是 **Ollama 运行时安装包**（约 200MB），不是队友那个含模型的 zip
+//（那个里面已经有 1.9GB 的 gguf，模型我们单独放在 models/ 下，避免重复打包）
+const OLLAMA_RUNTIME_CANDIDATES = [
+  resolve('Ollama-darwin.zip'),
+  resolve('/tmp/Ollama-darwin.zip'),
+  resolve(process.env.HOME || '', 'Downloads', 'Ollama-darwin.zip'),
+]
+const OLLAMA_ZIP_SRC = OLLAMA_RUNTIME_CANDIDATES.find((item) => existsSync(item)) || OLLAMA_RUNTIME_CANDIDATES[0]
+const OLLAMA_ZIP_NAME = 'Ollama-运行时.zip'
 
 const FILES = [
   '启动电脑版.command',
   '启动电脑版.bat',
+  '启动AI.command',
+  '启动AI.bat',
   'package.json',
   'pnpm-lock.yaml',
   'README.md',
@@ -30,6 +47,7 @@ const DIRS = [
   ['dist', 'dist'],
   ['docs', 'docs'],
   ['firmware', 'firmware'],
+  ['ai', 'ai'],
 ]
 
 const README = `FireAegis · 电脑版（${stamp}）
@@ -43,6 +61,18 @@ const README = `FireAegis · 电脑版（${stamp}）
     它会自动：检查 Node → 启动硬件接收端（默认 8787）→ 启动站点 →
              等站点就绪后用独立窗口打开指挥端（自动进"电脑监看"模式）
     如果提示没装 Node：macOS 去 nodejs.org 下 LTS；Windows 可让脚本用 winget 装。
+
+【想连 AI（推荐一起做）】
+    先双击 启动AI.command（macOS）/ 启动AI.bat（Windows），它会：
+      · 装好并启动 Ollama（本包已带离线安装包时不会联网）
+      · 导入决策模型 fireaegis（视觉/决策两块 AI 自动接上）
+      · 启动视觉服务（YOLO + ai/best.pt，端口 8000）
+    然后再双击「启动电脑版」。系统端打开后右上角会显示
+    「AI 就绪 · fireaegis:latest + YOLO」。
+
+    · 视觉 AI：ai/best.pt（队友训练的火焰/烟雾模型），端口 8000
+    · 决策 AI：本地 Ollama 的 fireaegis（qwen2.5-3b-instruct），端口 11434
+    · 没有 AI 也能跑：页面会自动回落到本机规则引擎，报警与疏散不受影响。
 
 【第二步】把窗口放到大屏上
     · 指挥端地址：http://127.0.0.1:4173/mobile-app.html
@@ -82,6 +112,25 @@ async function main() {
   // 双击启动器必须保留可执行位
   const macLauncher = join(stage, '启动电脑版.command')
   if (existsSync(macLauncher)) await chmod(macLauncher, 0o755)
+  const aiLauncher = join(stage, '启动AI.command')
+  if (existsSync(aiLauncher)) await chmod(aiLauncher, 0o755)
+
+  // 离线版：把决策模型（1.9GB）与 Ollama 离线安装包一起放进去
+  if (withModel) {
+    if (existsSync(MODEL_SRC)) {
+      await mkdir(join(stage, 'models'), { recursive: true })
+      console.log(`· 打包决策模型：${MODEL_SRC}`)
+      await cp(MODEL_SRC, join(stage, 'models', 'qwen2.5-3b-instruct.gguf'))
+    } else {
+      console.warn(`⚠️ 没找到决策模型（${MODEL_SRC}），离线版将不含大模型`)
+    }
+    if (existsSync(OLLAMA_ZIP_SRC)) {
+      console.log(`· 打包 Ollama 运行时（${OLLAMA_ZIP_SRC}）`)
+      await cp(OLLAMA_ZIP_SRC, join(stage, OLLAMA_ZIP_NAME))
+    } else {
+      console.warn('⚠️ 没找到 Ollama 运行时安装包（Ollama-darwin.zip），离线版首次安装 Ollama 时需要联网')
+    }
+  }
   await writeFile(join(stage, '说明-先读我.txt'), README, 'utf8')
 
   await mkdir(outDir, { recursive: true })
@@ -93,9 +142,9 @@ async function main() {
     'root, out, name = sys.argv[1], sys.argv[2], sys.argv[3]',
     'with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:',
     '    for base, dirs, files in os.walk(os.path.join(root, name)):',
-    '        dirs[:] = [d for d in dirs if d not in {"node_modules", ".git"}]',
+    '        dirs[:] = [d for d in dirs if d not in {"node_modules", ".git", ".venv", "__pycache__", ".desktop-stage"}]',
     '        for f in files:',
-    '            if f.endswith(".log") or f == ".DS_Store":',
+    '            if f.endswith((".log", ".pyc")) or f == ".DS_Store":',
     '                continue',
     '            full = os.path.join(base, f)',
     '            z.write(full, os.path.relpath(full, root))',
