@@ -185,14 +185,18 @@ export const DEFAULT_HARDWARE_PORT = 8787
 
 // 端口优先级：--port 参数 > 环境变量 TG_HARDWARE_PORT > ai-config.json 的 hardwarePort > 平台默认
 // 这样"演示电脑用哪个端口"可以在配置文件里统一，固件那边只改一次。
-function portFromConfig() {
-  for (const candidate of ['public/ai-config.json', 'ai-config.json']) {
+// AI 接入配置：源码运行时在 public/，桌面版打包后在 dist/ —— 两处都找
+function readAiConfig() {
+  for (const candidate of ['public/ai-config.json', 'dist/ai-config.json', 'ai-config.json']) {
     try {
-      const config = JSON.parse(readFileSync(candidate, 'utf8'))
-      if (Number.isFinite(Number(config.hardwarePort))) return Number(config.hardwarePort)
+      return JSON.parse(readFileSync(candidate, 'utf8'))
     } catch {}
   }
   return null
+}
+function portFromConfig() {
+  const config = readAiConfig()
+  return config && Number.isFinite(Number(config.hardwarePort)) ? Number(config.hardwarePort) : null
 }
 // --port 支持逗号列表（例如 --port 8787,5011）：固件可能被烧成别的端口，
 // 同时听几个端口就不用为了换个端口去重烧固件。
@@ -211,19 +215,14 @@ const port = portFromArgs
   ?? DEFAULT_HARDWARE_PORT
 const host = readArg('--host', '0.0.0.0')
 const strictPort = hasFlag('--strict-port')
-const visionUrl = String(readArg('--vision-url', process.env.TG_VISION_URL || '')).replace(/\/$/, '')
+let visionUrl = String(readArg('--vision-url', process.env.TG_VISION_URL || '')).replace(/\/$/, '')
 const visionConf = Number(readArg('--vision-conf', '0.5'))
 // 终审阈值优先级：--yes-temp 参数 > 环境变量 TG_YES_TEMP > ai-config.json 的 yesTemp > 70
 // 注意：这和固件里的"发送触发阈值"（烟雾>200 或 温度>32）是两回事——
 // 固件那个决定"什么时候发数据"，这个决定"收到之后回 YES 还是 NO"。
 function yesTempFromConfig() {
-  for (const candidate of ['public/ai-config.json', 'ai-config.json']) {
-    try {
-      const config = JSON.parse(readFileSync(candidate, 'utf8'))
-      if (Number.isFinite(Number(config.yesTemp))) return Number(config.yesTemp)
-    } catch {}
-  }
-  return null
+  const config = readAiConfig()
+  return config && Number.isFinite(Number(config.yesTemp)) ? Number(config.yesTemp) : null
 }
 const yesTemp = Number(readArg('--yes-temp',
   Number.isFinite(Number(process.env.TG_YES_TEMP)) ? process.env.TG_YES_TEMP
@@ -945,7 +944,30 @@ function printBanner() {
 
 // 只有直接运行本文件时才启动服务；被测试/其它脚本 import 时不占端口
 const isCli = process.argv[1] && process.argv[1].endsWith('hardware-receiver.mjs')
+
+// 没显式给 --vision-url 时，自动探测本机的视觉服务（桌面版"自带 AI"靠这一步）
+export async function detectVisionService(candidates = ['http://127.0.0.1:8000', 'http://127.0.0.1:8080']) {
+  for (const base of candidates) {
+    try {
+      const response = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500) })
+      if (!response.ok) continue
+      const payload = await response.json().catch(() => ({}))
+      if (payload && payload.ok !== false) return base
+    } catch {}
+  }
+  return ''
+}
+
 if (isCli) {
+  if (!visionUrl) {
+    const found = await detectVisionService()
+    if (found) {
+      visionUrl = found
+      console.log(`· 自动发现视觉服务：${found}（AI 终审已启用，火焰/烟雾识别参与判定）`)
+    } else {
+      console.log('· 本机没发现视觉服务（8000/8080）：终审先用热像阈值；装好 AI 后重启本服务即可')
+    }
+  }
   activePort = await pickPort(port)
   server.on('error', (error) => {
     console.error(`端口 ${activePort} 无法监听：${error.message}`)
